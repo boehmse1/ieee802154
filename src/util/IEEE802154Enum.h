@@ -322,23 +322,23 @@ enum AddrMode {             // addressing mode of the coordinator to which a pol
     addrLong    = 0x03      // 64-bit extended address
 };
 
-enum BitMasksandShifts {
-    ftShift     = 13,
-    secuShift   = 12,
-    fpShift     = 11,
-    arequShift  = 10,
-    pidShift    = 9,
-    damShift    = 4,
-    fvShift     = 2,
-    samShift    = 0,
-    ftMask      = 57344,
-    secuMask    = 4096,
-    fpMask      = 2048,
-    arequMask   = 1024,
-    pidMask     = 512,
-    damMask     = 48,
-    fvMask      = 12,
-    samMask     = 3
+enum BitMasksandShifts {    // see IEEE802154-2006 7.2.1.1 / IEEE802154Mac::genFcf()
+    ftShift     = 0,
+    secuShift   = 3,
+    fpShift     = 4,
+    arequShift  = 5,
+    pidShift    = 6,
+    damShift    = 10,
+    fvShift     = 12,
+    samShift    = 14,
+    ftMask      = 7,
+    secuMask    = 8,
+    fpMask      = 16,
+    arequMask   = 32,
+    pidMask     = 64,
+    damMask     = 3072,
+    fvMask      = 12288,
+    samMask     = 49152,
 };
 
 enum MlmeAssociationStatus {
