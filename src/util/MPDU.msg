@@ -25,6 +25,7 @@ cplusplus {{
 class noncobject MACAddressExt;
 class noncobject SuperframeSpec;
 class noncobject GTSDescriptor;
+class noncobject GTSFields;
 class noncobject PendingAddrFields;
 class noncobject DevCapability;
 class noncobject Ash;
@@ -58,6 +59,7 @@ packet mpdu
 packet beaconFrame extends mpdu
 {
     SuperframeSpec sfSpec;                  // Superframe specifications
+    GTSFields gtsFields;                    // temp added GTS Fields for convenience with IEEE802154-2006 7.2.2.1 / serializer
     GTSDescriptor gtsList[7];	
     PendingAddrFields paFields;             // includes numLong numShort and List
 }

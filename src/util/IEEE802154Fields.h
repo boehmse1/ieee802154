@@ -108,6 +108,37 @@ struct GTSDescriptor
         bool Type;                  // true if it's a request
 };
 
+struct GTSCharacteristics
+{
+        unsigned char length;
+        bool direction;
+        bool type;
+};
+
+struct GTSSpecification
+{
+        unsigned char count;            // number of GTS descriptors
+        bool permit;
+};
+
+struct GTSDirections
+{
+        unsigned char mask;             // mask of directions
+};
+
+struct GTSList
+{
+        unsigned short devShortAddr;    // device short address
+        unsigned char startSlot;        // starting slot
+        unsigned char length;           // length in slots
+};
+
+struct GTSFields                        // temp added for convenience with IEEE802154-2006 7.2.2.1 / serializer
+{
+        GTSSpecification gtsSpec;
+        GTSDirections gtsDirs;
+};
+
 struct PendingAddrFields
 {
         unsigned char numShortAddr;     // number of short addresses pending
