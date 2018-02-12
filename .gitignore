@@ -19,6 +19,7 @@
 *.exe
 *.out
 *.app
+/src/IEEE802154INET-Standalone
 /src/util/mcpsData_m.h
 /src/util/MPDU_m.cc
 /src/util/MPDU_m.h
