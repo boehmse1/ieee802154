@@ -24,6 +24,8 @@
 /src/util/MPDU_m.h
 /src/util/PPDU_m.cc
 /src/util/PPDU_m.h
+/src/util/serializer/RawPacket_m.cc
+/src/util/serializer/RawPacket_m.h
 /src/util/mcpsData_m.cc
 /src/util/mcpsData_m.h
 /out
