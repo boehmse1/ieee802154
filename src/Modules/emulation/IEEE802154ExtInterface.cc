@@ -67,165 +67,56 @@ void IEEE802154ExtInterface::initialize(int stage)
 
 void IEEE802154ExtInterface::finish()
 {
-  //count sth and EV it
+    EV << getFullPath() << ": " << numSent << " packets sent, " <<
+            numRcvd << " packets received, " << numDropped <<" packets dropped.\n";
 }
 
 void IEEE802154ExtInterface::handleMessage(cMessage *msg)
 {
-    extEV << "[ExtInterface]: msg arrive " << std::string(msg->getName()) << endl;
-    if (msg == initEvent){
-        //handlePcapFileHeader();
-        //FileHeader arrived
-    }
-    else if(std::string(msg->getName()) == "waitForBytes"){
-       //std::cout << "time elapsed: " << getSimulation()->getSimTime().str() << " sec."<< endl;
-       std::cout << "time elapsed: " << simulation.getSimTime().str() << " sec." << endl;
-    }
-    else if(std::string(msg->getName()) == "pktHdrMsg"){
-       //handleHdr();
-        r->peekBlock(curr_block, recvPos);
-        recvPos += curr_block.total_length;
-        extEV << "processed until: " << recvPos << endl;
-    }
-    else if (std::string(msg->getName()) == "IDB Event"){
-        extEV << "handle Interface Data" << endl;
-        r->peekBlock(curr_block, recvPos);
-        recvPos += curr_block.total_length;
-        extEV << "processed until: " << recvPos << endl;
+    extEV << "Got Message " << msg->getName() << endl;
 
-        extEV << getParentModule()->getSubmodule("extClient") << std::endl; //found extInterface can acces via cModule: getId(), Name
+    // start of a pcapng stream
+    if (dynamic_cast<SHB *>(msg)){
+        cancelAndDelete(msg);
     }
-    else if (std::string(msg->getName()) == "EPB Event"){
-        extEV << "handle Enhanced Packet Data" << endl;
-
+    // todo: add interface?
+    else if (dynamic_cast<IDB *>(msg)){
+        cancelAndDelete(msg);
+    }
+    // epb packet with encapsulated sdu from extern node
+    else if (dynamic_cast<EPB *>(msg)){
         handleEPB(msg);
     }
-    else if (msg == rtEvent){  //obsolet
-        extEV << "Event from extern" << endl;
+    // message from intern simulation host
+    else if (msg->arrivedOn("inDirect")){
+        handleMsgSim(msg);
     }
-    else {
-        // received pkt to external Device(s)
-        if (msg->arrivedOn("inDirect")){
-
-            if (std::string(msg->getName()) == "PLME-CCA.request") {                      //ccaRequ == CCA
-                extEV << "PLME-CCA.request" << endl;
-            } else if (std::string(msg->getName()) == "PLME-SET-TRX-STATE.request") {
-                extEV << "PLME-SET-TRX-STATE.request" << endl;
-            } else if (std::string(msg->getName()) == "SET") {
-                extEV << "SET" << endl;
-            } else if (std::string(msg->getName()) == "GET") {
-                extEV << "GET" << endl;
-            } else if (std::string(msg->getName()) == "edRequ") {                //edRequ == ED
-                extEV << "ED" << endl;
-            } else if (std::string(msg->getName()) == "PD-DATA"){
-                extEV << "msg classname: " << msg->getClassName() << endl;
-                if (dynamic_cast<ppdu *>(msg) != NULL){
-                    ppdu *pdu = check_and_cast<ppdu*>(msg);
-                    extEV << "pkt name: " << std::string(pdu->getName()) << " has encapsulated: " << pdu->hasEncapsulatedPacket() << endl;
-                    if (pdu->hasEncapsulatedPacket()){
-                        handleReply(msg);
-                    }
-                }
-
-            }
-            else {
-              // PD <-> mpdu
-              //handleReply(check_and_cast<PlainPkt *>(msg));
-              //  handleReply(msg);
-                extEV << "msg classname: " << msg->getClassName() << endl;
-            }
-        }
-    }
-
 }
 
 void IEEE802154ExtInterface::handleEPB(cMessage *msg)
 {
+    unsigned char rtBuffer[1<<16];
 
-    PlainPkt *plainMsg = check_and_cast<PlainPkt *>(msg);
-    int clientAddr = plainMsg->getSrcAddress();
-    int srvAddr = plainMsg->getDestAddress();
-    unsigned int caplen = plainMsg->getCaplen();
-    unsigned int pos = plainMsg->getPos();
-    unsigned int interfaceid = plainMsg->getInterface_id();
+    EPB *epb = check_and_cast<EPB *>(msg);
+    Buffer b(rtBuffer, epb->getDataArraySize());
 
-    extEV << "Packet in EPB begins: " << pos << " with length of: " << caplen
-       << " from Interface_ID: " << interfaceid << endl;
+    // Message from external interface
+    cMessage *sdu;
+    sdu = IEEE802154Serializer().deserializeSDU(b);
 
-    r->peekBlock(curr_block, recvPos);
-    recvPos += curr_block.total_length;
-    extEV << "processed until: " << recvPos << endl;
+    // corresponding module
+    cModule *mod = simulation.getModule(interfaceTable[epb->getInterface()]);
+    cModule *phy = mod->getSubmodule("NIC")->getSubmodule("PHY");
 
-    // de-serialize IEEE 802.15.4 to OMNeT++ Format
-    Buffer b((recvBuffer + pos), caplen);
-    //Context c;
-    //c.throwOnSerializerNotFound = false;
+    this->sendDirect(sdu, phy, "inFromExt");
 
-    mpdu *frame;
-    frame = check_and_cast<mpdu *>(
-            (IEEE802154Serializer().deserialize(b)));
-    std::cout << "Frame deserialized as: " << frame->getClassName()
-            << std::endl;
-    //check if error
-    if (b.hasError()) {
-        EV_ERROR << "Error deserialize Frame with Buffer. Buffer pos: "
-                        << b.getPos() << " and remaingByte size: "
-                        << b.getRemainingSize() << endl;
-    }
+    EV << "[ExtInterface]: send message from extern to simulated Node: " << std::string(mod->getName()) << endl;
 
-    // send the mpdu in a NetPacket
-    PlainPkt *pkt = new PlainPkt();
-    pkt->setInterface_id(plainMsg->getInterface_id());      //external device_id
-    pkt->setSrcAddress(this->getId());
-    pkt->setDestAddress(srvAddr);
-    //pkt->encapsulate(frame);
-    //send(pkt, "g$o");
-
-    //targetModule = getParentModule()->getSubmodule("IEEE802154Nodes[1]");  //IEEE802154ExtNodes              //error
-    //targetModule = getParentModule()->getSubmodule("IEEE802154ExtNodes"); //test um alle Module zu erhalten, error
-    //targetModule = simulation.getModuleByPath("SchedulerTest.IEEE802154Node[0].NIC.MAC.Buffer.inMLME"); // error
-    //cModule *sim = simulation.getModule(1);
-    // only for testing purpose
-
-
-    extEV << getParentModule()->getSubmodule("extClient") << std::endl; //found extInterface can acces via cModule: getId(), Name, works
-    cModule *mod = simulation.getModule(interfaceTable[interfaceid]);
-
-    strstr << "SchedulerTest." << std::string(mod->getName()) << "[" << interfaceid << "]" << ".NIC.ExtPHY";
-    std::string test = strstr.str();
-    std::cout << test << std::endl;
-    std::string s = (mod->getSubmodule("NIC")->getName());
-    std::cout << s << std::endl;
-
-    std::string s2 = (mod->getSubmodule("NIC")->getSubmodule("ExtPHY")->getName());
-        std::cout << s2 << std::endl;
-
-    cModule *mygate = mod->getSubmodule("NIC")->getSubmodule("ExtPHY");
-    std::cout << "gatesize: " << mygate->getGateNames().size() << std::endl;
-    std::cout << std::string(mygate->gate("inFromExt")->getName()) << std::endl;
-
-
-    this->sendDirect(frame, mygate, "inFromExt");
-
-    //delete(frame);
-
-    //mod->getSubmodule("NIC")->getSubmodule("ExtPHY");  //will be terrible crash, each pointer can return NULL
-    //mod->getModuleByPath("NIC.ExtPHY") nullpointer should be absolute path, mod->getName() +"NIC.ExtPHY";
-
-    //TODO: get MACAdr from IDB Block, check mac
-
-    //this->sendDirect() based on Interface ID and module id, TODO: configurations Parameter getPar
-    // send MPDU to node
-    //if (std::string(frame->getClassName()) == "CmdFrame"){
-    //    this->sendDirect(frame, simulation.getModule(interfaceTable[interfaceid]), "inFromExt");  //"inMLME", hopefully works else IEEE802154ExtPHY ID Table...
-    //}
-    /*else {
-        this->sendDirect(frame, simulation.getModule(interfaceTable[interfaceid]), "inMCPS");
-    }*/
+    cancelAndDelete(msg);
 
 }
 
-void IEEE802154ExtInterface::handleReply(cMessage *msg)
+void IEEE802154ExtInterface::handleMsgSim(cMessage *msg)
 {
     extEV << "Send msg " << msg->getClassName() << " from intern simulation to external devices" << endl;
     unsigned char mybuf[128+32+3];

@@ -1,5 +1,6 @@
 //
 // Copyright (C) 2017 Christoph Schwalbe (original code)
+// Copyright (C) 2018 Sebastian Boehm (BTU-CS) (fundamental changes in message passing and handling)
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
@@ -38,8 +39,9 @@
 #include <string>
 // only for debug and module path name discovery
 
-#include "PCAPNGReader.h"
 #include "pcapng.h"
+#include "PCAPNGReader.h"
+#include "PCAPNG_m.h"
 #include "PCAPRTScheduler.h"
 
 
@@ -94,7 +96,7 @@ class IEEE802154ExtInterface : public cSimpleModule
     virtual void handleMessage(cMessage *msg) override;
     virtual void finish() override;
     void handleEPB(cMessage *msg);
-    void handleReply(cMessage *msg);
+    void handleMsgSim(cMessage *msg);
 
 };
 
