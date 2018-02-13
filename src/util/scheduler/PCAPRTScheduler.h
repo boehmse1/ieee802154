@@ -1,8 +1,13 @@
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Copyright (C) 2005 Andras Varga,
+//                    Christian Dankbar, Irene Ruengeler, Michael Tuexen
+// Copyright (C) 2017 Christoph Schwalbe (original PCAP extensions)
+// Copyright (C) 2018 Sebastian Boehm (BTU-CS)
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU Lesser General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -10,13 +15,8 @@
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with this program.  If not, see http://www.gnu.org/licenses/.
+// along with this program; if not, see <http://www.gnu.org/licenses/>.
 //
-// With lots piece of Code from inet3.4/src/int/linklayer/ext/cSocketRTScheduler.h
-// ^-> (c) written by
-// Copyright (C) 2005 Andras Varga,
-//                    Christian Dankbar, Irene Ruengeler, Michael Tuexen
-// 2016/2017 modified by Christoph Schwalbe
 
 #ifndef PCAPRTSCHEDULER_H_
 #define PCAPRTSCHEDULER_H_
@@ -24,7 +24,6 @@
 #define WANT_WINSOCK2
 
 #include <platdep/sockets.h>
-//#include "inet/common/INETDefs.h"
 #include "INETDefs.h"
 
 #if OMNETPP_VERSION < 0x500
@@ -46,26 +45,14 @@
 
 #include <vector>
 #include "PlainPkt_m.h"
-
-//Defines for fixed Frame chunks
-/*
-#define global_pcap_frame_size 24
-#define local_pcap_frame_size  16
-#define ethernet_frame_size    14
-#define ip_frame_size          20
-#define udp_frame_size          8
-#define tcp_frame_size         20
-*/
-
-//pcapng
 #include "pcapng.h"
 #include "PCAPNGReader.h"
+#include "Buffer.h"
 
-//using namespace inet;
+#define rtEV (ev.isDisabled()) ? std::cout : std::cout << "[PCAPRTScheduler]: "    // switchable debug output
 
 /*
- * PCAPRTScheduler = PcapRTScheduler with embedded IEEE 802.15.4 Frame inside PCAP
- * These RTScheduler should schedule Packets with PCAP-Data.
+ * This RTScheduler should PCAP Packets.
  */
 class PCAPRTScheduler : public cRealTimeScheduler
 {
@@ -157,6 +144,10 @@ class PCAPRTScheduler : public cRealTimeScheduler
      */
     virtual cMessage *getNextEvent();
 
+    /**
+     * Send payload with EPB
+     */
+    void sendEPB(int interface, simtime_t_cref time, Buffer &b);
 
     /**
      * Send on the currently open connection
@@ -182,33 +173,6 @@ class PCAPRTScheduler : public cRealTimeScheduler
     void handleBlock();
 
     bool waitForBlock();
-
-
-    // read 4 Bytes in little Endian
-    inline bpf_u_int32 read4Bytes(unsigned char * buf, int from)
-    {
-            bpf_u_int32 value = 0;
-
-            value = buf[from];
-            value = (value & 0xFF) << 8;
-            value = (value | buf[from+1]);
-            value = (value & 0xFFFF) << 8;
-            value = (value | buf[from+2]);
-            value = (value & 0xFFFFFF) << 8;
-            value = (value | buf[from+3]);
-            return value;
-    }
-
-    // read 2 Bytes in little Endian
-    inline bpf_u_int32 read2Bytes(unsigned char * buf, int from)
-    {
-        bpf_u_int32 value = 0;
-
-        value = buf[from];
-        value = (value & 0xFF) << 8;
-        value = (value | buf[from + 1]);
-        return value;
-    }
 };
 
 #endif /* PCAPRTSCHEDULER_H_ */

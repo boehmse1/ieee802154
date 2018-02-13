@@ -28,7 +28,6 @@ PCAPRTScheduler::PCAPRTScheduler() : cRealTimeScheduler()
     nextFramePos = 0;
     count = 0;
 
-    //pcapng
     SHBMagicReaded = false;
     IDBReaded = false;
     idb_counter = 0;
@@ -41,7 +40,7 @@ PCAPRTScheduler::~PCAPRTScheduler()
 
 std::string PCAPRTScheduler::info() const
 {
-    return "RealTime Scheduler based on Socket for IEEE 802.15.4 embedded in PCAPng";
+    return "RealTime Scheduler based on PCAPNG over TCP-Socket";
 }
 
 
@@ -93,7 +92,7 @@ void PCAPRTScheduler::executionResumed()
     gettimeofday(&baseTime, nullptr);
     baseTime = timeval_substract(baseTime, SIMTIME_DBL(simTime()));
 }
-//PCAPNGReader: PCAPNGReader *reader
+
 void PCAPRTScheduler::setInterfaceModule(cModule *mod, cMessage *notifMsg, cMessage *initMsg, unsigned char *buf, int bufSize, int *nBytesPtr)
 {
     if (module){
@@ -111,11 +110,7 @@ void PCAPRTScheduler::setInterfaceModule(cModule *mod, cMessage *notifMsg, cMess
     numBytesPtr = nBytesPtr;
     *numBytesPtr = 0;
 
-    //pcapng
     r = new PCAPNGReader(buf, bufSize);
-
-    //TODO: forward my Reader, to easy access the same buffer and data in ExtInterface, oder eigener reader auf buf, bufSize
-    //reader = new PCAPNGReader(buf, bufSize);
 }
 
 
@@ -149,12 +144,12 @@ bool PCAPRTScheduler::receiveWithTimeout(long usec)
                 throw cRuntimeError("PCAPRTScheduler: interface module's recvBuffer is full");  //FIXME: do Ringbuffer
             nBytes = recv(connSocket, bufPtr, bufLeft, 0);
             if (nBytes == SOCKET_ERROR) {
-                EV << "PCAPRTScheduler: socket error " << sock_errno() << "\n";
+                rtEV << "socket error " << sock_errno() << "\n";
                 closesocket(connSocket);
                 connSocket = INVALID_SOCKET;
             }
             else if (nBytes == 0) {
-                EV << "PCAPRTScheduler: socket closed by the client\n";
+                rtEV << "socket closed by the client\n";
                 if (shutdown(connSocket, SHUT_WR) == SOCKET_ERROR)
                     throw cRuntimeError("PCAPRTScheduler: shutdown() failed");
                 closesocket(connSocket);
@@ -163,7 +158,7 @@ bool PCAPRTScheduler::receiveWithTimeout(long usec)
             //nBytes > 0
             else {
                 // schedule notificationMsg for the interface module
-                EV << "PCAPRTScheduler: received " << nBytes << " bytes\n";
+                rtEV << "received " << nBytes << " bytes\n";
                 (*numBytesPtr) += nBytes;
 
                 std::cout << "PCAPRTScheduler: received " << nBytes << " bytes\n";
@@ -184,9 +179,9 @@ bool PCAPRTScheduler::receiveWithTimeout(long usec)
                    // handle Block content
                    while((*numBytesPtr-nextFramePos) >= curr_block.total_length)
                    {
-                       std::cout << "currentBytes: " << (*numBytesPtr-nextFramePos) << " len: " << curr_block.total_length << std::endl;
+                       std::cout << "PCAPRTScheduler: currentBytes: " << (*numBytesPtr-nextFramePos) << " len: " << curr_block.total_length << std::endl;
                        r->peekBlock(curr_block, nextFramePos);
-                       std::cout << "peekBlock: " << curr_block.block_type << std::endl;
+                       std::cout << "PCAPRTScheduler: peekBlock: " << curr_block.block_type << std::endl;
                        handleBlock();
                    }
 
@@ -203,7 +198,7 @@ bool PCAPRTScheduler::receiveWithTimeout(long usec)
             connSocket = accept(listenerSocket, (sockaddr *) &sinRemote, (socklen_t *) &addrSize);
             if (connSocket == INVALID_SOCKET)
                 throw cRuntimeError("PCAPRTScheduler: accept() failed");
-            EV << "PCAPRTScheduler: connected!\n";
+            rtEV << "PCAPRTScheduler: connected!\n";
         }
     }
     return false;
@@ -278,6 +273,7 @@ cMessage *PCAPRTScheduler::getNextEvent()
     // ok, return the message
     return msg;
 }
+
 /*
 void PCAPRTScheduler::putBackEvent(cMessage *event)
 {
@@ -285,37 +281,72 @@ void PCAPRTScheduler::putBackEvent(cMessage *event)
 }
 */
 
+void PCAPRTScheduler::sendEPB(int interface, simtime_t_cref time, Buffer &b)
+{
+    block_header header;
+    enhanced_packet_block packet;
+    block_trailer trailer;
+
+    unsigned short len = b.getPos();
+    uint8_t padding;
+    uint8_t pad[] = {0,0,0,0};
+
+    if (len%4) padding = 4 - (len%4);
+    else padding = 0;
+
+    header.block_type = BT_EPB;
+    header.total_length = sizeof(header) + sizeof(packet) + len + padding + sizeof(trailer);
+
+    packet.interface_id = interface;
+    packet.timestamp_high = (time.raw() - (time.raw() % time.getScale())) / time.getScale();
+    //packet.timestamp_high = time.inUnit(0);
+    packet.timestamp_low = 1000000 * (time.raw() % time.getScale()) / time.getScale();
+    //packet.timestamp_low = time.inUnit(-3);
+    packet.caplen = len;
+    packet.len = len;
+
+    trailer.total_length = header.total_length;
+
+    uint8_t *sendBuf = (uint8_t*)malloc(header.total_length);
+    memcpy(sendBuf, &header, sizeof(header));
+    memcpy(sendBuf+sizeof(header), &packet, sizeof(packet));
+    memcpy(sendBuf+sizeof(header)+sizeof(packet), b._getBuf(), len);
+    memcpy(sendBuf+sizeof(header)+sizeof(packet)+len, &pad, padding);
+    memcpy(sendBuf+sizeof(header)+sizeof(packet)+len+padding, &trailer, sizeof(trailer));
+
+    sendBytes(sendBuf, header.total_length);
+}
+
 void PCAPRTScheduler::sendBytes(unsigned char *buf, size_t numBytes)
 {
     if (connSocket == INVALID_SOCKET)
             throw cRuntimeError("PCAPRTScheduler: sendBytes(): no connection");
 
-        int transmitted = send(connSocket, buf, numBytes, 0);
-        // TBD check for errors
+    int transmitted = send(connSocket, buf, numBytes, 0);
 
-        //TODO: decide Option: "sends plain pk" or "with PCAP File Header and Packet Header" or "with PCAPNG SHB + EPB", see old Code of this class for PCAP related stuff
-        if ((size_t) transmitted == numBytes)
-            EV << "{Sent an Pcap File Header + Pcap Packet Header + IEEE 802.15.4 Frame} with length of " << transmitted << " bytes.\n";
-        else
-            EV << "Sending of an {Pcap / IEEE 802.15.4 Frame} FAILED! (sendto returned " << transmitted << " (" << strerror(errno) << ") instead of " << numBytes << ").\n";
+    free(buf);
+
+    if ((size_t) transmitted == numBytes)
+        rtEV << "sendBytes(): send with length " << transmitted << endl;
+    else
+        rtEV << "sendBytes(): send with length " << numBytes << " failed. Sendbytes: " << transmitted << endl;
 }
 
-//Linktype
 void PCAPRTScheduler::checkPacket(uint16_t LinkType)
 {
     switch(LinkType)
     {
     case DLT_IEEE802_15_4_NOFCS:
-        EV << "LinkType is: DLT_IEEE802_15_4_NOFCS" << endl; //TODO: verify that no FCS at the end of 1. Frame
+        rtEV << "LinkType is: DLT_IEEE802_15_4_NOFCS" << endl; //TODO: verify that no FCS at the end of 1. Frame
         break;
     case DLT_IEEE802_15_4:
-        EV << "LinkType is: DLT_IEEE802_15_4" << endl;       //TODO: handle FCS, is not enabled in serializer! //FIXME:
+        rtEV << "LinkType is: DLT_IEEE802_15_4" << endl;       //TODO: handle FCS, is not enabled in serializer! //FIXME:
         break;
     case DLT_IEEE802_15_4_NONASK_PHY:
-        EV << "LinkType is: DLT_IEEE802_15_4_NONASK_PHY" << endl;  // not handled
+        rtEV << "LinkType is: DLT_IEEE802_15_4_NONASK_PHY" << endl;  // not handled
         break;
     default:
-        EV << "unknown LinkType Number: " << LinkType << endl;
+        rtEV << "unknown LinkType Number: " << LinkType << endl;
     }
 }
 
@@ -358,9 +389,9 @@ void PCAPRTScheduler::handleFileHdr()
 
 void PCAPRTScheduler::handleSHB()
 {
-    std::cout << "handle SHB" << std::endl;
-    std::cout << "nextFrameLength " << nextFrameLength << std::endl;
-    std::cout << "nextFramePos " << nextFramePos << std::endl;
+    std::cout << "PCAPRTScheduler: handle SHB" << std::endl;
+    std::cout << "PCAPRTScheduler: nextFrameLength " << nextFrameLength << std::endl;
+    std::cout << "PCAPRTScheduler: nextFramePos " << nextFramePos << std::endl;
     if ((unsigned) *numBytesPtr >= nextFrameLength) {
         r->openSectionHeader();
         //SHBMagicReaded = r->getMagicReaded();  //FIXME:
@@ -384,7 +415,7 @@ void PCAPRTScheduler::handleIDB()
       r->openBlock();
 
       this->nextFrameLength = r->getBlockLength();
-      std::cout << "nextFrameLength " << nextFrameLength << std::endl;
+      std::cout << "PCAPRTScheduler: nextFrameLength " << nextFrameLength << std::endl;
 
       if ((unsigned)*numBytesPtr >= nextFrameLength)
       {
@@ -394,7 +425,7 @@ void PCAPRTScheduler::handleIDB()
         //to, from
         memcpy(euiaddr, r->getEUIAddr(), (size_t) 8);
 
-        std::cout << "euiaddr: " << euiaddr << std::endl;
+        std::cout << "PCAPRTScheduler: euiaddr: " << euiaddr << std::endl;
 
         timeval curTime;
         gettimeofday(&curTime, nullptr);
@@ -406,7 +437,7 @@ void PCAPRTScheduler::handleIDB()
         //IDBMSGEvent->setArrival(module->getId(), -1, t);
         //getSimulation()->getFES()->insert(IDBMSGEvent);
 
-        EV << "IDB arrived with LinkType: " << r->getLinkType() << endl;
+        rtEV << "IDB arrived with LinkType: " << r->getLinkType() << endl;
         // vector solution
         cMessage *neu = new cMessage("IDB Event");
         neu->setArrival(module, -1, t);
@@ -421,11 +452,11 @@ void PCAPRTScheduler::handleIDB()
 
 void PCAPRTScheduler::handleEPB()
 {
-    std::cout << "SHBMagicReaded: " << SHBMagicReaded << " IDBReaded: " << IDBReaded << std::endl;
+    std::cout << "PCAPRTScheduler: SHBMagicReaded: " << SHBMagicReaded << " IDBReaded: " << IDBReaded << std::endl;
     if (SHBMagicReaded and IDBReaded){
       r->openBlock();
       this->nextFrameLength = r->getBlockLength();
-      std::cout << "nextFrameLength " << nextFrameLength << std::endl;
+      std::cout << "PCAPRTScheduler: nextFrameLength " << nextFrameLength << std::endl;
       if ((unsigned)*numBytesPtr >= nextFrameLength)
       {
         r->openEnhancedPacketBlock();
@@ -439,7 +470,7 @@ void PCAPRTScheduler::handleEPB()
         // TBD assert that it's somehow not smaller than previous event's time
 
         enhanced_packet_block tmp = r->getEPB();
-        std::cout << "caplen: " << tmp.caplen << " interface_id: " << tmp.interface_id << std::endl;
+        std::cout << "PCAPRTScheduler: caplen: " << tmp.caplen << " interface_id: " << tmp.interface_id << std::endl;
 
             //packet
 //            unsigned char *data;
@@ -472,22 +503,22 @@ void PCAPRTScheduler::handleBlock()
             handleFileHdr();
             handleSHB();
             nextFramePos += curr_block.total_length;
-            std::cout << "nextFramePos: " << nextFramePos << std::endl;
+            std::cout << "PCAPRTScheduler: nextFramePos: " << nextFramePos << std::endl;
             break;
         case BT_IDB:
             handleIDB();
             nextFramePos += curr_block.total_length;
-            std::cout << "nextFramePos: " << nextFramePos << std::endl;
+            std::cout << "PCAPRTScheduler: nextFramePos: " << nextFramePos << std::endl;
             break;
         case BT_EPB:
             handleEPB();
             nextFramePos += curr_block.total_length;
-            std::cout << "nextFramePos: " << nextFramePos << std::endl;
+            std::cout << "PCAPRTScheduler: nextFramePos: " << nextFramePos << std::endl;
             break;
         case BT_SPB: //handleSPB();
             break;
         default: {
-          EV << "Not supported Block recognized, next Data is garbage. You need to skip it manually" << endl;
+          rtEV << "Not supported Block recognized, next Data is garbage. You need to skip it manually" << endl;
         }
     }
 }
