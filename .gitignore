@@ -27,6 +27,10 @@
 /src/util/PPDU_m.h
 /src/util/pcap/PCAPNG_m.cc
 /src/util/pcap/PCAPNG_m.h
+/src/util/scheduler/NetPkt_m.cc
+/src/util/scheduler/NetPkt_m.h
+/src/util/scheduler/PlainPkt_m.cc
+/src/util/scheduler/PlainPkt_m.h
 /src/util/serializer/RawPacket_m.cc
 /src/util/serializer/RawPacket_m.h
 /src/util/mcpsData_m.cc
