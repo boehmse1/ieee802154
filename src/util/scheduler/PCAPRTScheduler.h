@@ -103,6 +103,7 @@ class PCAPRTScheduler : public cRealTimeScheduler
       int nBytes;
 
       virtual void setupListener();
+      virtual void connectSocket();
       virtual bool receiveWithTimeout(long usec);
       virtual int receiveUntil(const timeval& targetTime);
   public:

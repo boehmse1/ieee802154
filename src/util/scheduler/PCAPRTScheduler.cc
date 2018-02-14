@@ -63,7 +63,23 @@ void PCAPRTScheduler::startRun()
 
     port = this->sim->getEnvir()->getConfig()->getAsInt(CFGID_SOCKETRTSCHEDULER_PORT);
     //port = getEnvir()->getConfig()->getAsInt(CFGID_SOCKETRTSCHEDULER_PORT);
-    setupListener();
+    //setupListener();
+    connectSocket();
+}
+
+void PCAPRTScheduler::connectSocket()
+{
+    connSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (connSocket == INVALID_SOCKET)
+        throw cRuntimeError("PCAPRTScheduler: cannot create socket");
+
+    sockaddr_in sinInterface;
+    sinInterface.sin_family = AF_INET;
+    sinInterface.sin_addr.s_addr = INADDR_ANY;
+    sinInterface.sin_port = htons(port);
+    if (connect(connSocket,(sockaddr *) &sinInterface, sizeof(sockaddr_in)) < 0){
+        throw cRuntimeError("PCAPRTScheduler: socket connect() failed");
+    }
 }
 
 void PCAPRTScheduler::setupListener()
