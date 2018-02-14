@@ -52,14 +52,13 @@ void IEEE802154ExtPhy::initialize(int stage)
         for (cModule::SubmoduleIterator i(network); !i.end(); i++) {
             cModule *submodp = i();
             // todo: by name?
-            if (std::string(submodp->getFullName()) == "IEEE802154ExtInterface") {
+            if (std::string(submodp->getFullName()) == "IEEE802154Ext") {
                 extInterfaceID = submodp->getId();
             }
         }
 
         this->moduleID = host->getId();
     }
-
 }
 
 ppdu *IEEE802154ExtPhy::generatePPDU(cMessage *psdu, bool ackFlag)
