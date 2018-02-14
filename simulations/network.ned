@@ -16,7 +16,7 @@
 package ieee802154.simulations;
 
 import inet.world.radio.ChannelControl;
-import ieee802154.src.NED.IEEE802154Host;
+import ieee802154.src.NED.emulation.IEEE802154ExtHost;
 import ieee802154.src.NED.emulation.IEEE802154ExtInterface;
 
 network net
@@ -24,14 +24,17 @@ network net
     parameters:
         int numHosts;
 
+        @display("bgb=206,287");
     submodules:
         channelControl: ChannelControl {
             @display("p=75,20");
         }
-        IEEE802154Nodes[numHosts]: IEEE802154Host {
+        IEEE802154Nodes[numHosts]: IEEE802154ExtHost {
             @display("i=device/antennatower;p=100,100;i2=status/bulb,white");
         }
-        IEEE802154Ext: IEEE802154ExtInterface;
+        IEEE802154Ext: IEEE802154ExtInterface {
 
+            @display("p=75,243");
+        }
     connections allowunconnected:
 }
