@@ -21,17 +21,10 @@ PCAPRTScheduler::PCAPRTScheduler() : cRealTimeScheduler()
     listenerSocket = INVALID_SOCKET;
     connSocket = INVALID_SOCKET;
 
-    globalPcapReaded = false;
-    localPcapReaded = false;
-    localPcapPktReaded = false;
-    arrived = 0;
     nextFramePos = 0;
-    count = 0;
 
-    SHBMagicReaded = false;
+    SHBReaded = false;
     IDBReaded = false;
-    idb_counter = 0;
-
 }
 
 PCAPRTScheduler::~PCAPRTScheduler()
@@ -54,9 +47,6 @@ void PCAPRTScheduler::startRun()
     module = nullptr;
     notificationMsg = nullptr;
     this->waitforBytes = new cMessage("waitForBytes");
-    pktHdrMsg = new cMessage("pktHdrMsg");
-    //this->IDBMSGEvent = new cMessage("IDB Event");
-    //this->EPBMSGEvent = new cMessage("EPB Event");
     recvBuffer = nullptr;
     recvBufferSize = 0;
     numBytesPtr = nullptr;
@@ -100,7 +90,7 @@ void PCAPRTScheduler::setupListener()
 
 void PCAPRTScheduler::endRun()
 {
-    std::cout << "end run" << endl;
+    rtEV << "end run" << endl;
 }
 
 void PCAPRTScheduler::executionResumed()
@@ -126,13 +116,13 @@ void PCAPRTScheduler::setInterfaceModule(cModule *mod, cMessage *notifMsg, cMess
     numBytesPtr = nBytesPtr;
     *numBytesPtr = 0;
 
-    r = new PCAPNGReader(buf, bufSize);
+    pcapng = new PCAPNGReader(buf, bufSize);
 }
 
 
 bool PCAPRTScheduler::receiveWithTimeout(long usec)
 {
-    std::cout << "amount of Bytes in Buffer: " << *numBytesPtr << " "<< nextFramePos << " received new Bytes: " << nBytes << std::endl;
+    rtEV << "amount of Bytes in Buffer: " << *numBytesPtr << " "<< nextFramePos << " received new Bytes: " << nBytes << std::endl;
 
     // prepare sets for select()
     fd_set readFDs, writeFDs, exceptFDs;
@@ -177,33 +167,27 @@ bool PCAPRTScheduler::receiveWithTimeout(long usec)
                 rtEV << "received " << nBytes << " bytes\n";
                 (*numBytesPtr) += nBytes;
 
-                std::cout << "PCAPRTScheduler: received " << nBytes << " bytes\n";
+                // handleFragments() for dummy events
+                if ((*numBytesPtr-nextFramePos) <= 8){
+                    handleFragments();
+                } else {
+                    //more than 8 Bytes arrived check Block_Trailer
+                    pcapng->peekBlock(curr_block, nextFramePos);
 
-               // handleFragments() for dummy events
-               if ((*numBytesPtr-nextFramePos) <= 8){
-                   handleFragments();
-               } else {
-                   //more than 8 Bytes arrived check Block_Trailer
-                   r->peekBlock(curr_block, nextFramePos);
+                    //bytes are missing, we not already received complete packet
+                    if (! ((*numBytesPtr-nextFramePos) >= curr_block.total_length)){
+                        handleFragments();
+                    }
 
-                   //bytes are missing, we not already received complete packet
-                   if (! ((*numBytesPtr-nextFramePos) >= curr_block.total_length)){
-                          handleFragments();
-                   }
+                    //TODO: if while(...) will not succed than else
+                    // handle Block content
+                    while((*numBytesPtr-nextFramePos) >= curr_block.total_length) {
+                        rtEV << "PCAPRTScheduler: currentBytes: " << (*numBytesPtr-nextFramePos) << " len: " << curr_block.total_length << std::endl;
+                        pcapng->peekBlock(curr_block, nextFramePos);
+                        handleBlock();
+                    }
 
-                   //TODO: if while(...) will not succed than else
-                   // handle Block content
-                   while((*numBytesPtr-nextFramePos) >= curr_block.total_length)
-                   {
-                       std::cout << "PCAPRTScheduler: currentBytes: " << (*numBytesPtr-nextFramePos) << " len: " << curr_block.total_length << std::endl;
-                       r->peekBlock(curr_block, nextFramePos);
-                       std::cout << "PCAPRTScheduler: peekBlock: " << curr_block.block_type << std::endl;
-                       handleBlock();
-                   }
-
-               }//else
-
-
+                } //else
                 return true;  //yes there was an Event
             }
         }
@@ -366,7 +350,6 @@ void PCAPRTScheduler::checkPacket(uint16_t LinkType)
     }
 }
 
-// Bytes received but not enough for evaluate a Block
 void PCAPRTScheduler::handleFragments()
 {
     timeval curTime;
@@ -376,138 +359,105 @@ void PCAPRTScheduler::handleFragments()
     // TBD assert that it's somehow not smaller than previous event's time
     waitforBytes->setArrival(module, -1, t);
 
+    // dummy Event for FES to consume for ExtInterface
     simulation.msgQueue.insert(waitforBytes);
-    //Generates dummy Event for FES to consume for ExtInterface,
-    //without this the simulation would "think" there are nothing more to do and stop the simulation
 }
 
-void PCAPRTScheduler::handleFileHdr()
+void PCAPRTScheduler::handleSHB()
 {
-    // solution
-    // if (*numBytesPtr >= 12 Byte) at least the Field: Block Total Length arrived ... calc Block length
-    if (*numBytesPtr >= 8 and SHBMagicReaded == false) {
-        if (MAGIC_NUMBER_SHB == read4Bytes(recvBuffer, 0)) {
-            r->openBlock();
-            this->nextFrameLength = r->getBlockLength();
-            //SHBMagicReaded = true;   // r->getCurrentBlockHeader().block_type should 0x0A0D0D0A
-            //normalerweise cool und richtig, Probleme der Nebenläufigkeit erfordern andere Maßnahmen
+    if (*numBytesPtr >= 8 and SHBReaded == false) {
+        if (BT_SHB == read4Bytes(recvBuffer, 0)) {
+            pcapng->openBlock();
+
+            this->nextFrameLength = pcapng->getBlockLength();
+            rtEV << "nextFrameLength " << nextFrameLength << std::endl;
+
+            if ((unsigned) *numBytesPtr >= nextFrameLength) {
+                pcapng->openSectionHeader();
+
+                timeval curTime;
+                gettimeofday(&curTime, nullptr);
+                curTime = timeval_substract(curTime, baseTime);
+                simtime_t t = curTime.tv_sec + curTime.tv_usec * 1e-6;
+                // TBD assert that it's somehow not smaller than previous event's time
+
+                initMsg->setArrival(module, -1, t);
+                simulation.msgQueue.insert(initMsg);
+
+                SHBReaded = true;
+            }
+        }
+    }
+}
+
+void PCAPRTScheduler::handleIDB()
+{
+    if (SHBReaded == true) {
+        pcapng->openBlock();
+
+        this->nextFrameLength = pcapng->getBlockLength();
+        rtEV << "nextFrameLength " << nextFrameLength << std::endl;
+
+        if ((unsigned)*numBytesPtr >= nextFrameLength) {
+            pcapng->openInterfaceDescription();
 
             timeval curTime;
             gettimeofday(&curTime, nullptr);
             curTime = timeval_substract(curTime, baseTime);
             simtime_t t = curTime.tv_sec + curTime.tv_usec * 1e-6;
             // TBD assert that it's somehow not smaller than previous event's time
-            initMsg->setArrival(module, -1, t);
-            simulation.msgQueue.insert(initMsg);
+
+            cMessage *idbMsg = new cMessage("IDB Event");
+            idbMsg->setArrival(module, -1, t);
+            IDBMSGEvent.push_back(idbMsg);
+            simulation.msgQueue.insert(IDBMSGEvent.back());
+
+            IDBReaded = true;
         }
+    } else {
+        rtEV << "SHBReaded: " << SHBReaded << std::endl;
     }
-}
-
-void PCAPRTScheduler::handleSHB()
-{
-    std::cout << "PCAPRTScheduler: handle SHB" << std::endl;
-    std::cout << "PCAPRTScheduler: nextFrameLength " << nextFrameLength << std::endl;
-    std::cout << "PCAPRTScheduler: nextFramePos " << nextFramePos << std::endl;
-    if ((unsigned) *numBytesPtr >= nextFrameLength) {
-        r->openSectionHeader();
-        //SHBMagicReaded = r->getMagicReaded();  //FIXME:
-        //nextFramePos = IDB Block, next Block after SHB
-
-        timeval curTime;
-        gettimeofday(&curTime, nullptr);
-        curTime = timeval_substract(curTime, baseTime);
-        simtime_t t = curTime.tv_sec + curTime.tv_usec * 1e-6;
-        // TBD assert that it's somehow not smaller than previous event's time
-        pktHdrMsg->setArrival(module, -1, t);
-        simulation.msgQueue.insert(pktHdrMsg);
-
-        SHBMagicReaded = true;
-    }
-}
-
-void PCAPRTScheduler::handleIDB()
-{
-    //if (SHBMagicReaded == true){  //FIXME: shbmagicreaded flag
-      r->openBlock();
-
-      this->nextFrameLength = r->getBlockLength();
-      std::cout << "PCAPRTScheduler: nextFrameLength " << nextFrameLength << std::endl;
-
-      if ((unsigned)*numBytesPtr >= nextFrameLength)
-      {
-        r->openInterfaceDescription();
-        unsigned char * euiaddr = r->getEUIAddr();
-
-        //to, from
-        memcpy(euiaddr, r->getEUIAddr(), (size_t) 8);
-
-        std::cout << "PCAPRTScheduler: euiaddr: " << euiaddr << std::endl;
-
-        timeval curTime;
-        gettimeofday(&curTime, nullptr);
-        curTime = timeval_substract(curTime, baseTime);
-        simtime_t t = curTime.tv_sec + curTime.tv_usec * 1e-6;
-        // TBD assert that it's somehow not smaller than previous event's time
-
-        // single IDB solution
-        //IDBMSGEvent->setArrival(module->getId(), -1, t);
-        //getSimulation()->getFES()->insert(IDBMSGEvent);
-
-        rtEV << "IDB arrived with LinkType: " << r->getLinkType() << endl;
-        // vector solution
-        cMessage *neu = new cMessage("IDB Event");
-        neu->setArrival(module, -1, t);
-        IDBMSGEvent.push_back(neu);
-        simulation.msgQueue.insert(IDBMSGEvent.back());
-
-        IDBReaded = true;
-        idb_counter++;
-      }
-    //}
 }
 
 void PCAPRTScheduler::handleEPB()
 {
-    std::cout << "PCAPRTScheduler: SHBMagicReaded: " << SHBMagicReaded << " IDBReaded: " << IDBReaded << std::endl;
-    if (SHBMagicReaded and IDBReaded){
-      r->openBlock();
-      this->nextFrameLength = r->getBlockLength();
-      std::cout << "PCAPRTScheduler: nextFrameLength " << nextFrameLength << std::endl;
-      if ((unsigned)*numBytesPtr >= nextFrameLength)
-      {
-        r->openEnhancedPacketBlock();
+    if (SHBReaded and IDBReaded) {
+        pcapng->openBlock();
 
+        this->nextFrameLength = pcapng->getBlockLength();
+        rtEV << "nextFrameLength " << nextFrameLength << std::endl;
 
-        // schedule EPB als Message in FES
-        timeval curTime;
-        gettimeofday(&curTime, nullptr);
-        curTime = timeval_substract(curTime, baseTime);
-        simtime_t t = curTime.tv_sec + curTime.tv_usec * 1e-6;
-        // TBD assert that it's somehow not smaller than previous event's time
+        if ((unsigned)*numBytesPtr >= nextFrameLength) {
+            pcapng->openEnhancedPacketBlock();
 
-        enhanced_packet_block tmp = r->getEPB();
-        std::cout << "PCAPRTScheduler: caplen: " << tmp.caplen << " interface_id: " << tmp.interface_id << std::endl;
+            // schedule EPB als Message in FES
+            timeval curTime;
+            gettimeofday(&curTime, nullptr);
+            curTime = timeval_substract(curTime, baseTime);
+            simtime_t t = curTime.tv_sec + curTime.tv_usec * 1e-6;
+            // TBD assert that it's somehow not smaller than previous event's time
 
-            //packet
-//            unsigned char *data;
-//            r->getPacket(data);
-//            for (int i=0; i < tmp.caplen; i++){
-//                std::cout << std::hex << data[i] << " ";
-//            }
-//            std::cout << std::dec << std::endl;
+            unsigned char array[127];
+            unsigned char *data;
 
-        PlainPkt *pkt = new PlainPkt("EPB Event");
-        pkt->setByteLength(tmp.caplen);
-        pkt->setCaplen(tmp.caplen);
-        pkt->setInterface_id(tmp.interface_id);
-        pkt->setDestAddress(tmp.interface_id);
-        pkt->setSrcAddress(-1);
-        pkt->setPos(r->getPacketBegin()); // from that Position at Buffer the pkt begins
+            data = array;
+            pcapng->getPacket(data);
 
-        pkt->setArrival(module, -1, t);
-        EPBMSGEvent.push_back(pkt);
-        simulation.msgQueue.insert(EPBMSGEvent.back());
-      }
+            EPB *epb = new EPB("EPB Event");
+            enhanced_packet_block tmp = pcapng->getEPB();
+            epb->setCap_len(tmp.caplen);
+            epb->setInterface(tmp.interface_id);
+
+            for (uint8_t i=0; i<tmp.caplen; i++) {
+                epb->setData(i, array[i]);
+            }
+
+            epb->setArrival(module, -1, t);
+            EPBMSGEvent.push_back(epb);
+            simulation.msgQueue.insert(EPBMSGEvent.back());
+        }
+    } else {
+        rtEV << "SHBMagicReaded: " << SHBReaded << " IDBReaded: " << IDBReaded << std::endl;
     }
 }
 
@@ -516,34 +466,30 @@ void PCAPRTScheduler::handleBlock()
 
     switch (curr_block.block_type){
         case BT_SHB:
-            handleFileHdr();
             handleSHB();
             nextFramePos += curr_block.total_length;
-            std::cout << "PCAPRTScheduler: nextFramePos: " << nextFramePos << std::endl;
+            rtEV << "nextFramePos: " << nextFramePos << std::endl;
             break;
         case BT_IDB:
             handleIDB();
             nextFramePos += curr_block.total_length;
-            std::cout << "PCAPRTScheduler: nextFramePos: " << nextFramePos << std::endl;
+            rtEV << "nextFramePos: " << nextFramePos << std::endl;
             break;
         case BT_EPB:
             handleEPB();
             nextFramePos += curr_block.total_length;
-            std::cout << "PCAPRTScheduler: nextFramePos: " << nextFramePos << std::endl;
+            rtEV << "nextFramePos: " << nextFramePos << std::endl;
             break;
-        case BT_SPB: //handleSPB();
+        default:
+            rtEV << "Not supported Block recognized, next Data is garbage. You need to skip it manually" << endl;
             break;
-        default: {
-          rtEV << "Not supported Block recognized, next Data is garbage. You need to skip it manually" << endl;
-        }
     }
 }
 
 bool PCAPRTScheduler::waitForBlock()
 {
    // if not all Bytes for this Block arrives, simply wait
-   if ((unsigned int)*numBytesPtr >= curr_block.total_length)
-   {
+   if ((unsigned int)*numBytesPtr >= curr_block.total_length) {
        return false; //needs not to wait, all Bytes are present
    } else {
        return true; //needs to wait

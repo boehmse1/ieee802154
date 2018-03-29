@@ -11,35 +11,25 @@ IEEE802154ExtInterface::~IEEE802154ExtInterface()
 {
     cancelAndDelete(rtEvent);
     cancelAndDelete(initEvent);
-    delete(r);
-    delete(s);
+    delete(serializer);
 }
 
 void IEEE802154ExtInterface::initialize(int stage)
 {
     cSimpleModule::initialize(stage);
-    if (stage == 0)
-    {
-    rtEvent = new cMessage("rtEvent");
-    initEvent = new cMessage("SHB_Event");
-    rtScheduler = check_and_cast<PCAPRTScheduler *>(simulation.getScheduler());
-    rtScheduler->setInterfaceModule(this, rtEvent, initEvent, recvBuffer, 65536, &numRecvBytes);
 
-    s = new IEEE802154Serializer();
+    if (stage == 0) {
+        rtEvent = new cMessage("rtEvent");
+        initEvent = new cMessage("SHB_Event");
+        rtScheduler = check_and_cast<PCAPRTScheduler *>(simulation.getScheduler());
+        rtScheduler->setInterfaceModule(this, rtEvent, initEvent, recvBuffer, 65536, &numRecvBytes);
 
-    remainingPayloadBytes = 0;
-    recvPos = 0;
-    BytesLeft = 0;
+        serializer = new IEEE802154Serializer();
 
-    r = new PCAPNGReader(recvBuffer, 65536);
-
-    numSent = numRcvd = numDropped = 0;
+        numSent = numRcvd = 0;
 
         WATCH(numSent);
-        WATCH(numRcvd);
-        WATCH(numDropped);
         WATCH(numRecvBytes);
-        WATCH(recvPos);
         WATCH(interfaceTable[0]);
         WATCH(interfaceTable[1]);
         WATCH(interfaceTable[2]);
@@ -67,8 +57,7 @@ void IEEE802154ExtInterface::initialize(int stage)
 
 void IEEE802154ExtInterface::finish()
 {
-    EV << getFullPath() << ": " << numSent << " packets sent, " <<
-            numRcvd << " packets received, " << numDropped <<" packets dropped.\n";
+    extEV << getFullPath() << ": " << numSent << " packets sent, " << numRcvd << " packets received" << endl;
 }
 
 void IEEE802154ExtInterface::handleMessage(cMessage *msg)
@@ -79,7 +68,7 @@ void IEEE802154ExtInterface::handleMessage(cMessage *msg)
     if (dynamic_cast<SHB *>(msg)){
         cancelAndDelete(msg);
     }
-    // todo: add interface?
+    // todo: add interface!
     else if (dynamic_cast<IDB *>(msg)){
         cancelAndDelete(msg);
     }
@@ -95,14 +84,20 @@ void IEEE802154ExtInterface::handleMessage(cMessage *msg)
 
 void IEEE802154ExtInterface::handleEPB(cMessage *msg)
 {
+    extEV << "Handle EPB" << endl;
+
     unsigned char rtBuffer[1<<16];
 
     EPB *epb = check_and_cast<EPB *>(msg);
+    for (uint8_t i=0; i<epb->getDataArraySize(); i++) {
+        rtBuffer[i] = epb->getData(i);
+    }
+
     Buffer b(rtBuffer, epb->getDataArraySize());
 
     // Message from external interface
     cMessage *sdu;
-    sdu = IEEE802154Serializer().deserializeSDU(b);
+    sdu = serializer->deserializeSDU(b);
 
     // corresponding module
     cModule *mod = simulation.getModule(interfaceTable[epb->getInterface()]);
@@ -110,10 +105,11 @@ void IEEE802154ExtInterface::handleEPB(cMessage *msg)
 
     this->sendDirect(sdu, phy, "inFromExt");
 
-    EV << "[ExtInterface]: send message from extern to simulated Node: " << std::string(mod->getName()) << endl;
+    extEV << "send message from extern to simulated Node: " << std::string(mod->getName()) << endl;
+
+    this->numRcvd++;
 
     cancelAndDelete(msg);
-
 }
 
 void IEEE802154ExtInterface::handleMsgSim(cMessage *msg)
@@ -125,7 +121,7 @@ void IEEE802154ExtInterface::handleMsgSim(cMessage *msg)
     int interface_id = -1;
 
     for (unsigned int i=0; i < interfaceTable.size(); i++){
-        extEV << "interfaceTable["<<i<<"]="<<interfaceTable.at(i) << endl;
+        //extEV << "interfaceTable["<<i<<"]="<<interfaceTable.at(i) << endl;
         if (interfaceTable.at(i) == module_id){
             interface_id = i;
         }
@@ -138,8 +134,8 @@ void IEEE802154ExtInterface::handleMsgSim(cMessage *msg)
     extEV << "interface_id: " << interface_id << " from Module: " << msg->getSenderModule()->getParentModule()->getParentModule()->getName() << "["<<interface_id<<"] = " << module_id << endl;
 
     Buffer buf(mybuf, 128+32+3);
-    //IEEE802154Serializer().serialize(mpdu_pkt, buf);
-    IEEE802154Serializer().serializeSDU(msg, buf);
+    //serializer->serialize(mpdu_pkt, buf);
+    serializer->serializeSDU(msg, buf);
 
     rtScheduler->sendEPB(interface_id, msg->getArrivalTime(), buf);
     this->numSent++;

@@ -45,6 +45,7 @@
 
 #include <vector>
 #include "PlainPkt_m.h"
+#include "PCAPNG_m.h"
 #include "pcapng.h"
 #include "PCAPNGReader.h"
 #include "Buffer.h"
@@ -60,29 +61,17 @@ class PCAPRTScheduler : public cRealTimeScheduler
       int port;
 
       //Flags
-      bool globalPcapReaded;
-      bool localPcapReaded;
-      bool localPcapPktReaded;
-      bool SHBMagicReaded;
+      bool SHBReaded;
       bool IDBReaded;
 
-      const unsigned int MAGIC_NUMBER_SHB    = 0x0A0D0D0A;
-      const unsigned int MAGIC_NUMBER_BIG    = 0x1A2B3C4D;
-      const unsigned int MAGIC_NUMBER_Little = 0xD4C3B2A1;
-
-      struct pcap_file_header global_pcap_hdr;
-      struct pcap_pkthdr local_pcap_pkthdr;
-      std::vector <struct pcap_pkthdr> queue_pkthdr; //TODO: queue of shb blocks and data? in ... buffer queue?
-
-      PCAPNGReader *r;
+      PCAPNGReader *pcapng;
       block_header curr_block;
 
       cModule *module;
+
       cMessage *notificationMsg;
-      cMessage *initMsg;
       cMessage *waitforBytes;
-      cMessage *pktHdrMsg;
-      //cMessage *IDBMSGEvent;
+      cMessage *initMsg;
       std::vector<cMessage *>IDBMSGEvent;
       std::vector<cMessage *>EPBMSGEvent;
 
@@ -92,10 +81,6 @@ class PCAPRTScheduler : public cRealTimeScheduler
 
       unsigned int nextFramePos;
       unsigned int nextFrameLength;
-      unsigned int count;
-      unsigned int idb_counter;
-
-      unsigned int arrived;
 
       timeval baseTime;
       SOCKET listenerSocket;
@@ -106,6 +91,7 @@ class PCAPRTScheduler : public cRealTimeScheduler
       virtual void connectSocket();
       virtual bool receiveWithTimeout(long usec);
       virtual int receiveUntil(const timeval& targetTime);
+
   public:
     PCAPRTScheduler();
     virtual ~PCAPRTScheduler();
@@ -165,9 +151,7 @@ class PCAPRTScheduler : public cRealTimeScheduler
      */
     void checkPacket(uint16_t LinkType);
 
-    void handleBursts();
     void handleFragments();
-    void handleFileHdr();
     void handleSHB();
     void handleIDB();
     void handleEPB();

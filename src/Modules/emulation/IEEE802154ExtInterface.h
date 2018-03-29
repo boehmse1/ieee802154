@@ -58,36 +58,17 @@ class IEEE802154ExtInterface : public cSimpleModule
     PCAPRTScheduler *rtScheduler; /* access to real network interface via Scheduler class */
     cMessage *initEvent;  // signals that a pcap File Header Frame has complete arrived in Buffer
 
-
-    mpdu *IEEE802154_Frame;
-    cModule *targetModule;
     std::map<int, int> interfaceTable;  //interface_id = moduleid
 
-    MACAddressExt *ext;
-    Buffer *b;
-
-    std::stringstream strstr;
-    IEEE802154Serializer *s;
-
-    PCAPNGReader *r;
-    block_header curr_block;
+    IEEE802154Serializer *serializer;
 
     // statistics
     int numSent;
     int numRcvd;
-    int numDropped;
 
     unsigned char recvBuffer[1<<16];
     unsigned int recvPos;
     int numRecvBytes;
-    unsigned int BytesLeft;                                           //FIXME: clean obsolet stuff
-
-    unsigned char *beginPayloadptr;
-    unsigned char *endPayloadptr;                                      //FIXME: clean obsolet stuff
-
-    unsigned char payload[128];
-    unsigned int remainingPayloadBytes;
-
 
   public:
     IEEE802154ExtInterface();

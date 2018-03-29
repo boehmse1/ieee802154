@@ -75,7 +75,7 @@ void PCAPNGReader::peekBlock(block_header &block, int peekPos)
 void PCAPNGReader::openBlock()
 {
     if (isBlockOpen) {
-        std::cout << "already is a block open, block type: " << currentBlock->block_type << std::endl;
+        //std::cout << "already is a block open, block type: " << currentBlock->block_type << std::endl;
         throw std::invalid_argument("there is already an open block");
     }
 
@@ -83,7 +83,7 @@ void PCAPNGReader::openBlock()
     currentBlock->block_type = read4BytesNtohl(buffer, bufferPos);
     currentBlock->total_length = read4BytesNtohl(buffer, bufferPos+4);
 
-    std::cout << "== open block, block type: " << std::hex << currentBlock->block_type << std::dec << " ==" << std::endl;
+    //std::cout << "== open block, block type: " << std::hex << currentBlock->block_type << std::dec << " ==" << std::endl;
 
     bufferPos += sizeof(block_header);
 
@@ -98,7 +98,7 @@ void PCAPNGReader::closeBlock()
     currentTrailer->total_length = currentBlock->total_length;     //cmp this later with last 4 Bytes
     bufferPos += sizeof(block_trailer);
 
-    std::cout << "bufferPos: " << bufferPos << std::endl;
+    //std::cout << "bufferPos: " << bufferPos << std::endl;
 
     if (currentTrailer->total_length != this->currentBlock->total_length)
     {
@@ -107,9 +107,9 @@ void PCAPNGReader::closeBlock()
 
     //sectionSize += bufferPos;
     if (shb->section_length == SECTION_LENGTH_UNKOWN){
-        std::cout << "bufferPos: " << bufferPos << " of unknown sectionlength (-1)" << std::endl;
+        //std::cout << "bufferPos: " << bufferPos << " of unknown sectionlength (-1)" << std::endl;
     } else {
-        std::cout << "bufferPos: " << bufferPos << " of sectionlength: " << shb->section_length << std::endl;
+        //std::cout << "bufferPos: " << bufferPos << " of sectionlength: " << shb->section_length << std::endl;
     }
 
 
@@ -124,7 +124,7 @@ void PCAPNGReader::closeBlock()
     }
 
     isBlockOpen = false;
-    std::cout << "== closed block, block type " << this->currentBlock->block_type << " ==" << std::endl;
+    //std::cout << "== closed block, block type " << this->currentBlock->block_type << " ==" << std::endl;
 }
 
 void PCAPNGReader::openSectionHeader()
@@ -139,7 +139,7 @@ void PCAPNGReader::openSectionHeader()
 
     if (currentBlock->block_type == SectionHeader)
     {
-        std::cout << "open SHB" << std::endl;
+        //std::cout << "open SHB" << std::endl;
         shb = reinterpret_cast<section_header_block*>(buffer + bufferPos);
         shb->byte_order_magic = read4Bytes(buffer, bufferPos);
 
@@ -150,7 +150,7 @@ void PCAPNGReader::openSectionHeader()
         switch (shb->byte_order_magic)
         {
             case BYTE_ORDER_MAGIC:
-                  std::cout << "Big-Endian Byte-Order" << std::endl;
+                  //std::cout << "Big-Endian Byte-Order" << std::endl;
                   shb->major_version = read2Bytes(buffer, bufferPos+4);   //untestet
                   shb->minor_version = read2Bytes(buffer, bufferPos+6);   //untestet
                 break;
@@ -162,8 +162,8 @@ void PCAPNGReader::openSectionHeader()
                   part1 = read4BytesNtohl(buffer, bufferPos + 8); //FIXME: 64 bit ...
                   part2 = read4BytesNtohl(buffer, bufferPos + 12);
 
-                  std::cout << part1 << std::endl;
-                  std::cout << part2 << std::endl;
+                  //std::cout << part1 << std::endl;
+                  //std::cout << part2 << std::endl;
 
                   //section length == -1 == 0xFFFF FFFF FFFF FFFF
                   if (part1 == part2){
@@ -199,12 +199,12 @@ void PCAPNGReader::openSectionHeader()
         bufferPos += sizeof(section_header_block);
         //std::cout << "bufferPos: " << bufferPos << std::endl;
         //std::cout << "content: " << read4BytesNtohl(buffer, bufferPos) << std::endl;
-        std::cout << "Section Length: " << (uint64_t)shb->section_length << std::endl;
+        //std::cout << "Section Length: " << (uint64_t)shb->section_length << std::endl;
 
         //currentCursor->block_type = this->currentBlock->block_type;
         //currentCursor->data_remaining = shb->section_length - bufferPos;
         //currentCursor->data = static_cast<u_char*>(buffer[bufferPos]);
-        std::cout << "version: " << shb->major_version << std::endl;
+        //std::cout << "version: " << shb->major_version << std::endl;
 
         //verify supported Pcapng Version
         if (!(shb->major_version == PCAP_NG_VERSION_MAJOR)){
@@ -221,7 +221,7 @@ void PCAPNGReader::openSectionHeader()
 
     //OffsetPos = Block Total Length - SHB length without Options, if (OffsetPos > 0) there are Bytes for Options, or SHB is broken
     if (currentBlock->total_length - 28 > 0){
-        std::cout << "SHB has Options." << std::endl;
+        //std::cout << "SHB has Options." << std::endl;
         hasOptions = true;
         openSHBOptionBlock();
         //TODO: FIXME: What if the SHB is broken?
@@ -258,21 +258,21 @@ void PCAPNGReader::openSHBOptionBlock()
 {
     if (!hasOptions) throw std::invalid_argument("there are no Options.");
 
-    std::cout << "open SHB OptionBlock" << std::endl;
+    //std::cout << "open SHB OptionBlock" << std::endl;
 
     option = reinterpret_cast<option_header*>(buffer + bufferPos);
     option->option_code = read2BytesNtohs(buffer, bufferPos);
     option->option_length = read2BytesNtohs(buffer, bufferPos+2);
     bufferPos += sizeof(option_header);
 
-    std::cout << "option code: " << option->option_code << std::endl;
-    std::cout << "option length: " << option->option_length << std::endl;
+    //std::cout << "option code: " << option->option_code << std::endl;
+    //std::cout << "option length: " << option->option_length << std::endl;
 
     // UTF-8 conversion to string
     switch(option->option_code){
         case SEC_HARDWARE:
             memcpy(hw, buffer + bufferPos, (size_t)option->option_length);
-            this->printHexUTF8(hw, option->option_length);
+            //this->printHexUTF8(hw, option->option_length);
             //hw_info = read4Bytes(buffer, bufferPos);
             //std::cout << "hw info: " << hw_info << std::endl;
             //FIXME: convert to UTF-8 String
@@ -280,34 +280,34 @@ void PCAPNGReader::openSHBOptionBlock()
         case SEC_OS:
             //FIXME: convert to UTF-8 String
             memcpy(hw, buffer + bufferPos, (size_t)option->option_length);
-            printHexUTF8(hw, option->option_length);
+            //printHexUTF8(hw, option->option_length);
             break;
         case SEC_USERAPPL:
             //FIXME: convert to UTF-8 String
             memcpy(hw, buffer + bufferPos, (size_t)option->option_length);
-            printHexUTF8(hw, option->option_length);
+            //printHexUTF8(hw, option->option_length);
             break;
         case OPT_ENDOFOPT: /* end of options */
-            std::cout << "End of option, length: " << option->option_length << std::endl; //length should be 0
+            //std::cout << "End of option, length: " << option->option_length << std::endl; //length should be 0
             break;
 
         case OPT_COMMENT:
             memcpy(hw, buffer + bufferPos, (size_t)option->option_length); //FIXME: convert to UTF-8 String
-            std::cout << "comment " << std::endl;
-            printHexUTF8(hw, option->option_length);
+            //std::cout << "comment " << std::endl;
+            //printHexUTF8(hw, option->option_length);
             break;
 
         default: {
-            std::cout << "these is not a valid option" << std::endl;
+            //std::cout << "these is not a valid option" << std::endl;
         }
     }
 
-    std::cout << "bufferPos nach Options value: " << bufferPos << std::endl;
+    //std::cout << "bufferPos nach Options value: " << bufferPos << std::endl;
 
     // Pad Bytes Problem option->option_length + x Padding Bytes
     bufferPos+= option->option_length + skipPaddingBytes(option->option_length);
-    std::cout << "bufferPos: " << bufferPos << std::endl;
-    std::cout << "content: " << read4BytesNtohl(buffer, bufferPos) << std::endl;
+    //std::cout << "bufferPos: " << bufferPos << std::endl;
+    //std::cout << "content: " << read4BytesNtohl(buffer, bufferPos) << std::endl;
 
     //Is there another Option? or EndOpt?
     option = reinterpret_cast<option_header*>(buffer + bufferPos);
@@ -319,7 +319,7 @@ void PCAPNGReader::openSHBOptionBlock()
         this->hasEndOption = true;
         this->closeOption();
     } else {
-        std::cout << "has option: " << hasOptions << " und lade weiteren Block." << std::endl;
+        //std::cout << "has option: " << hasOptions << " und lade weiteren Block." << std::endl;
         openSHBOptionBlock();       //Achtung statische Loesung! -> dynamisch Lsg, setze flag, check Bytes and read again
         //kehre zum Aufrufer zurück und warte auf sein Signal: neue Bytes bzw. es sind noch genügend Bytes übrig.
         //  Was wäre dann genügend Bytes?
@@ -343,8 +343,8 @@ void PCAPNGReader::openInterfaceDescription()
     }  // check block_type == IDB ?
     isIDBOpen = true;
 
-    std::cout << "open IDB" << std::endl;
-    std::cout << "bufferPos: " << bufferPos << std::endl;
+    //std::cout << "open IDB" << std::endl;
+    //std::cout << "bufferPos: " << bufferPos << std::endl;
     idb = new interface_description_block;                           //reinterpret_cast
     //idb = static_cast<interface_description_block*>(idb);
     idb->linktype = read2BytesNtohs(buffer, bufferPos);
@@ -352,11 +352,11 @@ void PCAPNGReader::openInterfaceDescription()
     idb->snaplen = read4BytesNtohl(buffer, bufferPos+4);
 
     bufferPos += sizeof(interface_description_block);
-    std::cout << "bufferPos: " << bufferPos << std::endl;
+    //std::cout << "bufferPos: " << bufferPos << std::endl;
     //Options
     //OffsetPos = Block Total Length - IDB length without Options, if (OffsetPos > 0) there are Bytes for Options, or broken SHB
     if (currentBlock->total_length - 20 > 0) {
-        std::cout << "IDB has Options." << std::endl;
+        //std::cout << "IDB has Options." << std::endl;
         hasOptions = true;
         openIDBOptionBlock();
     }
@@ -377,28 +377,28 @@ void PCAPNGReader::openIDBOptionBlock()
 {
     if (!hasOptions) throw std::invalid_argument("there are no Options.");
 
-    std::cout << "open IDB OptionBlock" << std::endl;
+    //std::cout << "open IDB OptionBlock" << std::endl;
 
     option = reinterpret_cast<option_header*>(buffer + bufferPos);
     option->option_code = read2BytesNtohs(buffer, bufferPos);
     option->option_length = read2BytesNtohs(buffer, bufferPos+2);
     bufferPos += sizeof(option_header);
 
-    std::cout << "option code: " << option->option_code << std::endl;
-    std::cout << "option länge: " << option->option_length << std::endl;
+    //std::cout << "option code: " << option->option_code << std::endl;
+    //std::cout << "option länge: " << option->option_length << std::endl;
 
     // UTF-8 conversion to string missing, take care about Byte-Order with Address also
     switch(option->option_code){
         case IF_NAME:
             memcpy(name, buffer + bufferPos, (size_t)option->option_length);
             //name = read4Bytes(buffer, bufferPos);
-            std::cout << "if_name: " << name << std::endl;
+            //std::cout << "if_name: " << name << std::endl;
             //FIXME: convert to UTF-8 String
             break;
         case IF_DESCRIPTION:
             //FIXME: convert to UTF-8 String
             memcpy(description, buffer + bufferPos, (size_t)option->option_length);
-            std::cout << "description: " << description << std::endl;
+            //std::cout << "description: " << description << std::endl;
             break;
         case IF_FILTER:
             //FIXME: convert to UTF-8 String
@@ -421,7 +421,7 @@ void PCAPNGReader::openIDBOptionBlock()
                           mac = new MACAddress((char*)macaddr);                            //prototypisch
             break;
         case IF_EUIADDR:  memcpy(euiaddr, buffer + bufferPos, (size_t) 8);
-                          std::cout << "euiaddr found, do getEUIAddr()" << std::endl;
+                          //std::cout << "euiaddr found, do getEUIAddr()" << std::endl;
 
                           uint32_t test,test2;
                           test = read4Bytes(buffer, bufferPos);
@@ -437,9 +437,9 @@ void PCAPNGReader::openIDBOptionBlock()
                              result = "00" + result;
                           }
                           memcpy(euiaddr, result.c_str(), (size_t) 16);
-                          for(unsigned int i=0; i < 16; i+=2){
-                              std::cout << euiaddr[i] << euiaddr[i + 1] << " ";
-                          }
+                          //for(unsigned int i=0; i < 16; i+=2){
+                          //    std::cout << euiaddr[i] << euiaddr[i + 1] << " ";
+                          //}
 
                           //macext->setAddress(euiaddr);
                           //macext = macext->MACAddressExt((char*)euiaddr);  // with forward error correction didn't work (in same folder, check include path)
@@ -457,24 +457,24 @@ void PCAPNGReader::openIDBOptionBlock()
             break;
 
         case OPT_ENDOFOPT: /* end of options */
-            std::cout << "End of option länge: " << option->option_length << std::endl; //length sollte 0 sein
+            //std::cout << "End of option länge: " << option->option_length << std::endl; //length sollte 0 sein
             break;
         case OPT_COMMENT:
             memcpy(hw, buffer + bufferPos, (size_t)option->option_length); //FIXME: convert to UTF-8 String
-            std::cout << "comment " << hw << std::endl;
+            //std::cout << "comment " << hw << std::endl;
             break;
 
         default: {
-            std::cout << "these is not a valid option" << std::endl;
+            //std::cout << "these is not a valid option" << std::endl;
         }
     }
 
-    std::cout << "bufferPos nach Options value: " << bufferPos << std::endl;
+    //std::cout << "bufferPos nach Options value: " << bufferPos << std::endl;
 
     // Pad Bytes Problem option->option_length + x Padding Bytes
     bufferPos+= option->option_length + skipPaddingBytes(option->option_length);
-    std::cout << "bufferPos: " << bufferPos << std::endl;
-    std::cout << "content: " << read4BytesNtohl(buffer, bufferPos) << std::endl;
+    //std::cout << "bufferPos: " << bufferPos << std::endl;
+    //std::cout << "content: " << read4BytesNtohl(buffer, bufferPos) << std::endl;
 
     //Is there another Option? or EndOpt?
     option = reinterpret_cast<option_header*>(buffer + bufferPos);
@@ -486,7 +486,7 @@ void PCAPNGReader::openIDBOptionBlock()
         this->hasEndOption = true;
         closeOption();
     } else {
-        std::cout << "has option: " << hasOptions << " und lade weiteren Block." << std::endl;
+        //std::cout << "has option: " << hasOptions << " und lade weiteren Block." << std::endl;
         openIDBOptionBlock();       //Achtung statische Loesung! -> dynamisch Lsg, setze flag, check Bytes and read again
         //kehre zum Aufrufer zurück und warte auf sein Signal: neue Bytes bzw. es sind noch genügend Bytes übrig.
         //  Was wäre dann genügend Bytes?
@@ -500,20 +500,20 @@ void PCAPNGReader::openEnhancedPacketBlock()
     }
     isEPBOpen = true;
 
-    std::cout << "open EPB" << std::endl;
+    //std::cout << "open EPB" << std::endl;
     epb = reinterpret_cast<enhanced_packet_block*>(buffer + bufferPos);
     epb->interface_id = read4BytesNtohl(buffer, bufferPos);
     epb->timestamp_high = read4BytesNtohl(buffer, bufferPos+4);
     epb->timestamp_low = read4BytesNtohl(buffer, bufferPos+8);
     epb->caplen = read4BytesNtohl(buffer, bufferPos+12);     // Captured Packet Length
     epb->len = read4BytesNtohl(buffer, bufferPos+16);         // Original Packet Length
-    std::cout << "bufferPos: " << bufferPos << std::endl;
-    std::cout << "size of epb: " << currentBlock->total_length << std::endl;      // sizeof(enhanced_packet_block);
-    std::cout << "readed caplen: " << epb->caplen << std::endl;
+    //std::cout << "bufferPos: " << bufferPos << std::endl;
+    //std::cout << "size of epb: " << currentBlock->total_length << std::endl;      // sizeof(enhanced_packet_block);
+    //std::cout << "readed caplen: " << epb->caplen << std::endl;
     bufferPos += sizeof(enhanced_packet_block);
-    std::cout << "bufferPos after Packet readed: " << bufferPos << std::endl;
+    //std::cout << "bufferPos after Packet readed: " << bufferPos << std::endl;
     packetBegin = bufferPos;
-    std::cout << "i am cpy now EPB Packet Data" << std::endl;
+    //std::cout << "i am cpy now EPB Packet Data" << std::endl;
     memcpy(packet_data, buffer + bufferPos, (size_t)epb->caplen);
 
     //std::cout << "bufferPos before add epb_caplen and paddBytes: " << bufferPos << " caplen: " << epb->caplen << " padBytes: " << skipPaddingBytes(epb->caplen) << std::endl;
@@ -521,7 +521,7 @@ void PCAPNGReader::openEnhancedPacketBlock()
     //bufferPos += epb->caplen;
     //OffsetPos = Block Total Length - EPB length without Options, if (OffsetPos > 0) there are Bytes for Options, or broken Block err in section
     if (currentBlock->total_length - 32 - epb->caplen - skipPaddingBytes(epb->caplen) > 0) {
-        std::cout << "EPB has Options." << std::endl;
+        //std::cout << "EPB has Options." << std::endl;
         hasOptions = true;
         openEPBOptionBlock();
         //TODO: FIXME: What if the Block is broken? ignore it...
@@ -536,15 +536,15 @@ void PCAPNGReader::openEPBOptionBlock()
     if (!hasOptions)
         throw std::invalid_argument("there are no Options.");
 
-    std::cout << "open EPB OptionBlock" << std::endl;
+    //std::cout << "open EPB OptionBlock" << std::endl;
 
     option = reinterpret_cast<option_header*>(buffer + bufferPos);
     option->option_code = read2BytesNtohs(buffer, bufferPos);
     option->option_length = read2BytesNtohs(buffer, bufferPos + 2);
     bufferPos += sizeof(option_header);
 
-    std::cout << "option code: " << option->option_code << std::endl;
-    std::cout << "option länge: " << option->option_length << std::endl;
+    //std::cout << "option code: " << option->option_code << std::endl;
+    //std::cout << "option länge: " << option->option_length << std::endl;
 
     switch (option->option_code) {
         case EP_FLAGS:
@@ -557,25 +557,25 @@ void PCAPNGReader::openEPBOptionBlock()
             memcpy(dropcount, buffer + bufferPos, (size_t) option->option_length);
             break;
         case OPT_ENDOFOPT: /* end of options */
-            std::cout << "End of option länge: " << option->option_length << std::endl; //length sollte 0 sein
+            //std::cout << "End of option länge: " << option->option_length << std::endl; //length sollte 0 sein
             break;
 
         case OPT_COMMENT:
             memcpy(hw, buffer + bufferPos, (size_t) option->option_length); //FIXME: convert to UTF-8 String
-            std::cout << "comment " << std::endl;
+            //std::cout << "comment " << std::endl;
             break;
 
         default: {
-            std::cout << "these is not a valid option" << std::endl;
+            //std::cout << "these is not a valid option" << std::endl;
         }
     }
 
-    std::cout << "bufferPos nach Options value: " << bufferPos << std::endl;
+    //std::cout << "bufferPos nach Options value: " << bufferPos << std::endl;
 
     // Pad Bytes Problem option->option_length + x Padding Bytes
     bufferPos += option->option_length + skipPaddingBytes(option->option_length);
-    std::cout << "bufferPos: " << bufferPos << std::endl;
-    std::cout << "content: " << read4BytesNtohl(buffer, bufferPos) << std::endl;
+    //std::cout << "bufferPos: " << bufferPos << std::endl;
+    //std::cout << "content: " << read4BytesNtohl(buffer, bufferPos) << std::endl;
 
     //Is there another Option? or EndOpt?
     option = reinterpret_cast<option_header*>(buffer + bufferPos);
@@ -588,7 +588,7 @@ void PCAPNGReader::openEPBOptionBlock()
         this->closeOption();
     }
     else {
-        std::cout << "has option: " << hasOptions << " und lade weiteren Block." << std::endl;
+        //std::cout << "has option: " << hasOptions << " und lade weiteren Block." << std::endl;
         openEPBOptionBlock();       //Achtung statische Loesung! -> dynamisch Lsg, setze flag, check Bytes and read again
         //kehre zum Aufrufer zurück und warte auf sein Signal: neue Bytes bzw. es sind noch genügend Bytes übrig.
         //  Was wäre dann genügend Bytes?
@@ -610,14 +610,14 @@ void PCAPNGReader::openSimplePacketBlock(){
     }
     isSPBOpen = true;
 
-    std::cout << "open SPB" << std::endl;
+    //std::cout << "open SPB" << std::endl;
     spb = reinterpret_cast<simple_packet_block*>(buffer + bufferPos);
     spb->len = read4BytesNtohl(buffer, bufferPos);
 
-    std::cout << "bufferPos: " << bufferPos << std::endl;
+    //std::cout << "bufferPos: " << bufferPos << std::endl;
     bufferPos += sizeof(simple_packet_block);
-    std::cout << "bufferPos: " << bufferPos << std::endl;
-    std::cout << "i am cpy now SPB Packet Data" << std::endl;
+    //std::cout << "bufferPos: " << bufferPos << std::endl;
+    //std::cout << "i am cpy now SPB Packet Data" << std::endl;
     memcpy(packet_data, buffer + bufferPos, (size_t) spb->len);  //reuse of packet_data, used by EPB !
 
     bufferPos += spb->len + skipPaddingBytes(spb->len);

@@ -43,7 +43,7 @@ message EPB extends PCAPNG
     uint32 time_low;
     uint32 cap_len;
     uint32 orig_len;
-    uint8 data[];
+    uint8 data[127];
 }
 
 
