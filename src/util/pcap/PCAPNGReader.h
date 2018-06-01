@@ -193,6 +193,8 @@ public:
     void openFile(const char *filename);
     void closeFile();
 
+    std::string hexStr(unsigned char* data, int len);
+
     void peekBlock(block_header &block, int peekPos);
 
     void openBlock();

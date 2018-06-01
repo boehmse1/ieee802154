@@ -66,10 +66,22 @@ PCAPNGReader::~PCAPNGReader()
   //delete all frree
 }
 
+std::string PCAPNGReader::hexStr(unsigned char* data, int len)
+{
+    std::stringstream ss;
+    ss << std::hex;
+    for(int i=0;i<len;++i)
+        ss << std::setw(2) << std::setfill('0') << (int)data[i];
+    return ss.str();
+}
+
 void PCAPNGReader::peekBlock(block_header &block, int peekPos)
 {
+    //std::cout << "== peekBlock(" << peekPos << ") ==" << std::endl;
+    //std::cout << "== buffer: " << hexStr(buffer, 68) << " == " << std::endl;
     block.block_type = read4BytesNtohl(buffer, peekPos);
     block.total_length = read4BytesNtohl(buffer, peekPos+4);
+    //std::cout << "== peek block, block type: " << std::hex << block.block_type << std::dec << " ==" << std::endl;
 }
 
 void PCAPNGReader::openBlock()
@@ -124,11 +136,13 @@ void PCAPNGReader::closeBlock()
     }
 
     isBlockOpen = false;
-    //std::cout << "== closed block, block type " << this->currentBlock->block_type << " ==" << std::endl;
+    //std::cout << "== closed block, block type " << std::hex << currentBlock->block_type << std::dec << " ==" << std::endl;
 }
 
 void PCAPNGReader::openSectionHeader()
 {
+    //std:cout << "== openSectionHeader() ==" << std::endl;
+
     if(!currentBlock->block_type){
         throw std::invalid_argument("no Block Header have been currently processed, block_type is missing");
     }
@@ -154,7 +168,8 @@ void PCAPNGReader::openSectionHeader()
                   shb->major_version = read2Bytes(buffer, bufferPos+4);   //untestet
                   shb->minor_version = read2Bytes(buffer, bufferPos+6);   //untestet
                 break;
-            case BYTE_ORDER_MAGIC_LITTLE: std::cout << "Little-Endian Byte-Order" << std::endl;
+            case BYTE_ORDER_MAGIC_LITTLE:
+                  //std::cout << "Little-Endian Byte-Order" << std::endl;
                   //std::cout << "major: " << read2BytesNtohs(buffer, bufferPos+4) << std::endl;   //ntohs(read2Bytes(buffer, bufferPos+4));
                   shb->major_version = read2BytesNtohs(buffer, bufferPos + 4);
                   shb->minor_version = read2BytesNtohs(buffer, bufferPos + 6);
@@ -338,6 +353,8 @@ void PCAPNGReader::closeOption()
 // call openBlock() before
 void PCAPNGReader::openInterfaceDescription()
 {
+    //std:cout << "== openInterfaceDescription() ==" << std::endl;
+
     if(currentBlock->block_type != BT_IDB){
        throw std::invalid_argument("that Block is not an Interface Description Block");
     }  // check block_type == IDB ?
@@ -495,6 +512,8 @@ void PCAPNGReader::openIDBOptionBlock()
 
 void PCAPNGReader::openEnhancedPacketBlock()
 {
+    //std:cout << "== openEnhancedPacketBlock() ==" << std::endl;
+
     if(currentBlock->block_type != BT_EPB){
        throw std::invalid_argument("that Block is not an Enhanced Packet Block");
     }

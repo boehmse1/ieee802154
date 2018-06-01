@@ -132,6 +132,16 @@ class PCAPRTScheduler : public cRealTimeScheduler
     virtual cMessage *getNextEvent();
 
     /**
+     * Send SHB
+     */
+    void sendSHB();
+
+    /**
+    * Send IDB
+    */
+    void sendIDB(int linktype, int snaplen);
+
+    /**
      * Send payload with EPB
      */
     void sendEPB(int interface, simtime_t_cref time, Buffer &b);

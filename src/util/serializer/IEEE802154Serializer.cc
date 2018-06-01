@@ -226,6 +226,8 @@ void IEEE802154Serializer::serialize(const cPacket *pkt, Buffer &b)
             b.writeUint64(pdu->getSrc().getInt());
         }
 
+        //std::cout << "Serializer Stream after fcf: " << b.getByteStream(b.getPos()) << "\n";
+
         if (secuEnabled)
         {
             uint8_t secu = 0;
@@ -316,6 +318,8 @@ void IEEE802154Serializer::serialize(const cPacket *pkt, Buffer &b)
                         addr_count++;
                     }
 
+                    //std::cout << "Serializer Stream after Beacon: " << b.getByteStream(b.getPos()) << "\n";
+
                     if (dynamic_cast<const RawPacket*>(pdu->getEncapsulatedPacket()))
                     {
                         const RawPacket *payload = static_cast<const RawPacket*>(pdu->getEncapsulatedPacket());
@@ -323,6 +327,8 @@ void IEEE802154Serializer::serialize(const cPacket *pkt, Buffer &b)
                             b.writeByte(payload->getByteArray().getData(i));
                         }
                     }
+
+                    //std::cout << "Serializer Stream after Beacon Payload: " << b.getByteStream(b.getPos()) << "\n";
 
                 }
                 else
@@ -416,7 +422,7 @@ void IEEE802154Serializer::serialize(const cPacket *pkt, Buffer &b)
         // ---------------- MFR ----------------
         b.writeUint16(pdu->getFcs());
 
-        //std::cout << "Serializer Stream: " << b.getByteStream(b.getPos()) << endl;
+        //std::cout << "Serializer Stream: " << b.getByteStream(b.getPos()) << "\n";
     }
     else
         throw cRuntimeError("IEEE802154Serializer: Frame is not a mpdu!");

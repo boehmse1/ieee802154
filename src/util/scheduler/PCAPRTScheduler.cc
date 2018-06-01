@@ -51,10 +51,13 @@ void PCAPRTScheduler::startRun()
     recvBufferSize = 0;
     numBytesPtr = nullptr;
 
+    WATCH(recvBuffer);
+    WATCH(recvBufferSize);
+
     port = this->sim->getEnvir()->getConfig()->getAsInt(CFGID_SOCKETRTSCHEDULER_PORT);
     //port = getEnvir()->getConfig()->getAsInt(CFGID_SOCKETRTSCHEDULER_PORT);
-    //setupListener();
-    connectSocket();
+    setupListener();
+    //connectSocket();
 }
 
 void PCAPRTScheduler::connectSocket()
@@ -122,7 +125,7 @@ void PCAPRTScheduler::setInterfaceModule(cModule *mod, cMessage *notifMsg, cMess
 
 bool PCAPRTScheduler::receiveWithTimeout(long usec)
 {
-    rtEV << "amount of Bytes in Buffer: " << *numBytesPtr << " "<< nextFramePos << " received new Bytes: " << nBytes << std::endl;
+    //rtEV << "amount of Bytes in Buffer: " << *numBytesPtr << " "<< nextFramePos << " received new Bytes: " << nBytes << std::endl;
 
     // prepare sets for select()
     fd_set readFDs, writeFDs, exceptFDs;
@@ -147,7 +150,7 @@ bool PCAPRTScheduler::receiveWithTimeout(long usec)
             unsigned char *bufPtr = recvBuffer + (*numBytesPtr);
             int bufLeft = recvBufferSize - (*numBytesPtr);
             if (bufLeft <= 0)
-                throw cRuntimeError("PCAPRTScheduler: interface module's recvBuffer is full");  //FIXME: do Ringbuffer
+                throw cRuntimeError("interface module's recvBuffer is full");  //FIXME: do Ringbuffer
             nBytes = recv(connSocket, bufPtr, bufLeft, 0);
             if (nBytes == SOCKET_ERROR) {
                 rtEV << "socket error " << sock_errno() << "\n";
@@ -157,7 +160,7 @@ bool PCAPRTScheduler::receiveWithTimeout(long usec)
             else if (nBytes == 0) {
                 rtEV << "socket closed by the client\n";
                 if (shutdown(connSocket, SHUT_WR) == SOCKET_ERROR)
-                    throw cRuntimeError("PCAPRTScheduler: shutdown() failed");
+                    throw cRuntimeError("shutdown() failed");
                 closesocket(connSocket);
                 connSocket = INVALID_SOCKET;
             }
@@ -182,7 +185,7 @@ bool PCAPRTScheduler::receiveWithTimeout(long usec)
                     //TODO: if while(...) will not succed than else
                     // handle Block content
                     while((*numBytesPtr-nextFramePos) >= curr_block.total_length) {
-                        rtEV << "PCAPRTScheduler: currentBytes: " << (*numBytesPtr-nextFramePos) << " len: " << curr_block.total_length << std::endl;
+                        //rtEV << "currentBytes: " << (*numBytesPtr-nextFramePos) << " len: " << curr_block.total_length << std::endl;
                         pcapng->peekBlock(curr_block, nextFramePos);
                         handleBlock();
                     }
@@ -197,8 +200,11 @@ bool PCAPRTScheduler::receiveWithTimeout(long usec)
             int addrSize = sizeof(sinRemote);
             connSocket = accept(listenerSocket, (sockaddr *) &sinRemote, (socklen_t *) &addrSize);
             if (connSocket == INVALID_SOCKET)
-                throw cRuntimeError("PCAPRTScheduler: accept() failed");
-            rtEV << "PCAPRTScheduler: connected!\n";
+                throw cRuntimeError("Socket accept() failed");
+            rtEV << "Client connected on Port " << port << endl;
+            //sendSHB();
+            //sendIDB(DLT_USER0, 256);
+            //sendIDB(DLT_IEEE802_15_4_NOFCS, 256);
         }
     }
     return false;
@@ -281,6 +287,54 @@ void PCAPRTScheduler::putBackEvent(cMessage *event)
 }
 */
 
+void PCAPRTScheduler::sendSHB()
+{
+    block_header header;
+    section_header_block packet;
+    block_trailer trailer;
+
+    header.block_type = BT_SHB;
+    header.total_length = sizeof(header) + sizeof(packet) + sizeof(trailer);
+
+    packet.byte_order_magic = BYTE_ORDER_MAGIC;
+    packet.major_version = PCAP_NG_VERSION_MAJOR;
+    packet.minor_version = PCAP_NG_VERSION_MINOR;
+    packet.section_length = -1;
+
+    trailer.total_length = header.total_length;
+
+    uint8_t *sendBuf = (uint8_t*)malloc(header.total_length);
+    memcpy(sendBuf, &header, sizeof(header));
+    memcpy(sendBuf+sizeof(header), &packet, sizeof(packet));
+    memcpy(sendBuf+sizeof(header)+sizeof(packet), &trailer, sizeof(trailer));
+
+    sendBytes(sendBuf, header.total_length);
+}
+
+void PCAPRTScheduler::sendIDB(int linktype, int snaplen)
+{
+    block_header header;
+    interface_description_block packet;
+    block_trailer trailer;
+
+    header.block_type = BT_IDB;
+    header.total_length = sizeof(header) + sizeof(packet) + sizeof(trailer);
+
+    packet.linktype = linktype;
+    packet.reserved = 0;
+    packet.snaplen = snaplen;
+
+    trailer.total_length = header.total_length;
+
+    uint8_t *sendBuf = (uint8_t*)malloc(header.total_length);
+    memcpy(sendBuf, &header, sizeof(header));
+    memcpy(sendBuf+sizeof(header), &packet, sizeof(packet));
+    memcpy(sendBuf+sizeof(header)+sizeof(packet), &trailer, sizeof(trailer));
+
+    sendBytes(sendBuf, header.total_length);
+}
+
+
 void PCAPRTScheduler::sendEPB(int interface, simtime_t_cref time, Buffer &b)
 {
     block_header header;
@@ -326,10 +380,7 @@ void PCAPRTScheduler::sendBytes(unsigned char *buf, size_t numBytes)
 
     free(buf);
 
-    if ((size_t) transmitted == numBytes)
-        rtEV << "sendBytes(): send with length " << transmitted << endl;
-    else
-        rtEV << "sendBytes(): send with length " << numBytes << " failed. Sendbytes: " << transmitted << endl;
+    rtEV << "sendBytes(" << transmitted << ")" << endl;
 }
 
 void PCAPRTScheduler::checkPacket(uint16_t LinkType)
@@ -370,7 +421,7 @@ void PCAPRTScheduler::handleSHB()
             pcapng->openBlock();
 
             this->nextFrameLength = pcapng->getBlockLength();
-            rtEV << "nextFrameLength " << nextFrameLength << std::endl;
+            //rtEV << "nextFrameLength " << nextFrameLength << std::endl;
 
             if ((unsigned) *numBytesPtr >= nextFrameLength) {
                 pcapng->openSectionHeader();
@@ -396,7 +447,7 @@ void PCAPRTScheduler::handleIDB()
         pcapng->openBlock();
 
         this->nextFrameLength = pcapng->getBlockLength();
-        rtEV << "nextFrameLength " << nextFrameLength << std::endl;
+        //rtEV << "nextFrameLength " << nextFrameLength << std::endl;
 
         if ((unsigned)*numBytesPtr >= nextFrameLength) {
             pcapng->openInterfaceDescription();
@@ -425,7 +476,7 @@ void PCAPRTScheduler::handleEPB()
         pcapng->openBlock();
 
         this->nextFrameLength = pcapng->getBlockLength();
-        rtEV << "nextFrameLength " << nextFrameLength << std::endl;
+        //rtEV << "nextFrameLength " << nextFrameLength << std::endl;
 
         if ((unsigned)*numBytesPtr >= nextFrameLength) {
             pcapng->openEnhancedPacketBlock();
@@ -464,21 +515,23 @@ void PCAPRTScheduler::handleEPB()
 void PCAPRTScheduler::handleBlock()
 {
 
+    //rtEV << "handleBlock " << curr_block.block_type << std::endl;
+
     switch (curr_block.block_type){
         case BT_SHB:
             handleSHB();
             nextFramePos += curr_block.total_length;
-            rtEV << "nextFramePos: " << nextFramePos << std::endl;
+            //rtEV << "nextFramePos: " << nextFramePos << std::endl;
             break;
         case BT_IDB:
             handleIDB();
             nextFramePos += curr_block.total_length;
-            rtEV << "nextFramePos: " << nextFramePos << std::endl;
+            //rtEV << "nextFramePos: " << nextFramePos << std::endl;
             break;
         case BT_EPB:
             handleEPB();
             nextFramePos += curr_block.total_length;
-            rtEV << "nextFramePos: " << nextFramePos << std::endl;
+            //rtEV << "nextFramePos: " << nextFramePos << std::endl;
             break;
         default:
             rtEV << "Not supported Block recognized, next Data is garbage. You need to skip it manually" << endl;
