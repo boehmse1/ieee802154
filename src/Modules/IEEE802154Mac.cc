@@ -3052,7 +3052,8 @@ void IEEE802154Mac::doScan()
                 beaconReq->setSrc(myMacAddr);
                 beaconReq->setDest(MACAddressExt::BROADCAST_ADDRESS);
                 beaconReq->setDestPANid(0xffff);
-                beaconReq->setFcf(0);  // ignored upon reception
+                //beaconReq->setFcf(0);  // ignored upon reception
+                beaconReq->setFcf(genFCF(Command, mpib.getMacSecurityEnabled(), false, false, false, addrShort, 01, noAddr));
 
                 // send this direct to the coordinator
                 txBcnCmd = beaconReq;
@@ -4507,7 +4508,7 @@ void IEEE802154Mac::handleBcnTxTimer()
         }
         else  // it's time to transmit beacon
         {
-            ASSERT(txBeacon == NULL);
+            //ASSERT(txBeacon == NULL);
             // construct a beacon
             beaconFrame* tmpBcn = new beaconFrame("Ieee802154BEACONTimer");
             tmpBcn->setName("Ieee802154BEACONTimer");
@@ -4543,7 +4544,8 @@ void IEEE802154Mac::handleBcnTxTimer()
                 tmpBcn->setGtsList(0, gtsList[i]);
             }
             //pendingAddrFields
-            //tmpBcn->setPaFields(txPaFields);
+            PendingAddrFields pa = {};
+            tmpBcn->setPaFields(pa);
 
             tmpBcn->setByteLength(calcFrameByteLength(tmpBcn));
 
