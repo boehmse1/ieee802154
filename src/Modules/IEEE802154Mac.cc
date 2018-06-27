@@ -469,7 +469,7 @@ void IEEE802154Mac::handleUpperMsg(cMessage *msg)
         StartRequest* startMsg = check_and_cast<StartRequest*>(msg);
         isCoordinator = startMsg->getPANCoordinator();
         // inform PHY to set the new channel
-        setRadioChannel(startMsg->getLogicalChannel());
+        //setRadioChannel(startMsg->getLogicalChannel()); // tmp disabled for emulation mode
         mpib.setMacBeaconOrder(startMsg->getBeaconOrder());
         mpib.setMacSuperframeOrder(startMsg->getSuperframeOrder());
         mpib.setMacBattLifeExt(startMsg->getBatteryLifeExtension());
@@ -4504,7 +4504,7 @@ void IEEE802154Mac::handleBcnTxTimer()
                 delete txAck;
                 txAck = NULL;
             }
-            genSetTrxState(phy_TX_ON);
+            //genSetTrxState(phy_TX_ON); // tmp disable for emulation mode
         }
         else  // it's time to transmit beacon
         {
