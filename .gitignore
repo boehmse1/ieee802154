@@ -41,3 +41,5 @@
 /simulations/.tkenvlog
 /src/Makefile
 /simulations/.tkenvrc
+/src/util/serial/.idea
+.settings
