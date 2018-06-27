@@ -21,34 +21,32 @@ void IEEE802154ExtInterface::initialize(int stage)
     if (stage == 0) {
         rtEvent = new cMessage("rtEvent");
         initEvent = new cMessage("SHB Event");
-        rtScheduler = check_and_cast<PCAPRTScheduler *>(simulation.getScheduler());
+        rtScheduler = check_and_cast<PCAPRTUDSScheduler *>(simulation.getScheduler());
         rtScheduler->setInterfaceModule(this, rtEvent, initEvent, recvBuffer, 65536, &numRecvBytes);
 
         serializer = new IEEE802154Serializer();
 
         numSent = numRcvd = 0;
 
+        interfaces = 0;
+
         WATCH(numSent);
         WATCH(numRecvBytes);
-        WATCH(interfaceTable[0]);
-        WATCH(interfaceTable[1]);
-        WATCH(interfaceTable[2]);
 
         cModule *network = getParentModule();
 
         // fixme: temp!
+        int node = 0;
         for (cModule::SubmoduleIterator i(network); !i.end(); i++) {
             cModule *submodp = i();
-            if (std::string(submodp->getFullName()) == "IEEE802154Nodes[0]") {
-                interfaceTable[0] = submodp->getId();
-            }
-            if (std::string(submodp->getFullName()) == "IEEE802154Nodes[1]") {
-                interfaceTable[1] = submodp->getId();
-            }
-            if (std::string(submodp->getFullName()) == "IEEE802154Nodes[2]") {
-                interfaceTable[2] = submodp->getId();
+            if (std::regex_match(std::string(submodp->getFullName()), std::regex("(IEEE802154Nodes)(.*)"))) {
+                interfaceTable[node] = submodp->getId();
+                extEV << "Added module " << submodp->getId() << " to interfacTable[" << node << "]" << endl;
+                node++;
             }
         }
+
+        extEV << "Registered " << node << " nodes to interfaceTable size " << interfaceTable.size() << endl;
 
     }
 
@@ -69,7 +67,8 @@ void IEEE802154ExtInterface::handleMessage(cMessage *msg)
     }
     // todo: add interface!
     else if (dynamic_cast<IDB *>(msg)){
-        cancelAndDelete(msg);
+        handleIDB(msg);
+        //cancelAndDelete(msg);
     }
     // epb packet with encapsulated sdu from extern node
     else if (dynamic_cast<EPB *>(msg)){
@@ -79,6 +78,23 @@ void IEEE802154ExtInterface::handleMessage(cMessage *msg)
     else if (msg->arrivedOn("inDirect")){
         handleMsgSim(msg);
     }
+}
+
+void IEEE802154ExtInterface::handleIDB(cMessage *msg)
+{
+    IDB *idb = check_and_cast<IDB *>(msg);
+
+    if (interfaces < (int)interfaceTable.size()) {
+        if (idb->getLinktype() == DLT_USER0) {
+            extEV << simulation.getModule(interfaceTable[interfaces]) << " registered with Linktype " << idb->getLinktype() << endl;
+        }
+    } else {
+        extEV << "Extern Node " << interfaces << " with Linktype " << idb->getLinktype() << " does not exist in simulation!" << endl;
+    }
+
+    interfaces++;
+
+    cancelAndDelete(msg);
 }
 
 void IEEE802154ExtInterface::handleEPB(cMessage *msg)
