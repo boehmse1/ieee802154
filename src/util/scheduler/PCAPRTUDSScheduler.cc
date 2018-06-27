@@ -1,4 +1,4 @@
-#include <PCAPRTScheduler.h>
+#include <PCAPRTUDSScheduler.h>
 
 #if OMNETPP_BUILDNUM <= 1003
 #define FES(sim) (&sim->msgQueue)
@@ -7,16 +7,16 @@
 #endif
 
 
-Register_Class(PCAPRTScheduler);
+Register_Class(PCAPRTUDSScheduler);
 
-Register_GlobalConfigOption(CFGID_SOCKETRTSCHEDULER_PORT, "socketrtscheduler-port", CFG_INT, "4242", "When PCAPRTScheduler is selected as scheduler class: the port number PCAPRTScheduler listens on.");
+Register_GlobalConfigOption(CFGID_SOCKETRTUDSSCHEDULER_FILE, "socketrtscheduler-file", CFG_STRING, "/tmp/socket.uds", "When PCAPRTUDSScheduler is selected as scheduler class: the socket file descriptor PCAPRTScheduler listens on.");
 
 inline std::ostream& operator<<(std::ostream& out, const timeval& tv)
 {
     return out << (unsigned long)tv.tv_sec << "s" << tv.tv_usec << "us";
 }
 
-PCAPRTScheduler::PCAPRTScheduler() : cRealTimeScheduler()
+PCAPRTUDSScheduler::PCAPRTUDSScheduler() : cRealTimeScheduler()
 {
     listenerSocket = INVALID_SOCKET;
     connSocket = INVALID_SOCKET;
@@ -27,17 +27,17 @@ PCAPRTScheduler::PCAPRTScheduler() : cRealTimeScheduler()
     IDBReaded = false;
 }
 
-PCAPRTScheduler::~PCAPRTScheduler()
+PCAPRTUDSScheduler::~PCAPRTUDSScheduler()
 {
 }
 
-std::string PCAPRTScheduler::info() const
+std::string PCAPRTUDSScheduler::info() const
 {
-    return "RealTime Scheduler based on PCAPNG over TCP-Socket";
+    return "RealTime Scheduler based on PCAPNG over Unix Domain Socket";
 }
 
 
-void PCAPRTScheduler::startRun()
+void PCAPRTUDSScheduler::startRun()
 {
     if (initsocketlibonce() != 0)
         throw cRuntimeError("PCAPRTScheduler: Cannot initialize socket library");
@@ -54,8 +54,7 @@ void PCAPRTScheduler::startRun()
     WATCH(recvBuffer);
     WATCH(recvBufferSize);
 
-    port = this->sim->getEnvir()->getConfig()->getAsInt(CFGID_SOCKETRTSCHEDULER_PORT);
-    //port = getEnvir()->getConfig()->getAsInt(CFGID_SOCKETRTSCHEDULER_PORT);
+    uds = this->sim->getEnvir()->getConfig()->getAsString(CFGID_SOCKETRTUDSSCHEDULER_FILE);
     setupListener();
     //connectSocket();
 
@@ -64,54 +63,52 @@ void PCAPRTScheduler::startRun()
     }
 }
 
-void PCAPRTScheduler::connectSocket()
+void PCAPRTUDSScheduler::connectSocket()
 {
-    connSocket = socket(AF_INET, SOCK_STREAM, 0);
+    connSocket = socket(AF_LOCAL, SOCK_STREAM, 0);
     if (connSocket == INVALID_SOCKET)
-        throw cRuntimeError("PCAPRTScheduler: cannot create socket");
+        throw cRuntimeError("PCAPRTUDSScheduler: cannot create socket");
 
-    sockaddr_in sinInterface;
-    sinInterface.sin_family = AF_INET;
-    sinInterface.sin_addr.s_addr = INADDR_ANY;
-    sinInterface.sin_port = htons(port);
-    if (connect(connSocket,(sockaddr *) &sinInterface, sizeof(sockaddr_in)) < 0){
-        throw cRuntimeError("PCAPRTScheduler: socket connect() failed");
+    sockaddr_un sunInterface;
+    sunInterface.sun_family = AF_LOCAL;
+    std::strcpy(sunInterface.sun_path, uds.c_str());
+    if (connect(connSocket,(sockaddr *) &sunInterface, sizeof(sockaddr_un)) < 0){
+        throw cRuntimeError("PCAPRTUDSScheduler: socket connect() failed");
     }
 }
 
-void PCAPRTScheduler::setupListener()
+void PCAPRTUDSScheduler::setupListener()
 {
-    listenerSocket = socket(AF_INET, SOCK_STREAM, 0);
+    listenerSocket = socket(AF_LOCAL, SOCK_STREAM, 0);
     if (listenerSocket == INVALID_SOCKET)
-        throw cRuntimeError("PCAPRTScheduler: cannot create socket");
+        throw cRuntimeError("PCAPRTUDSScheduler: cannot create socket");
 
-    sockaddr_in sinInterface;
-    sinInterface.sin_family = AF_INET;
-    sinInterface.sin_addr.s_addr = INADDR_ANY;
-    sinInterface.sin_port = htons(port);
-    if (bind(listenerSocket, (sockaddr *) &sinInterface, sizeof(sockaddr_in)) == SOCKET_ERROR)
-        throw cRuntimeError("PCAPRTScheduler: socket bind() failed");
+    sockaddr_un sunInterface;
+    sunInterface.sun_family = AF_LOCAL;
+    std::strcpy(sunInterface.sun_path, uds.c_str());
+    if (bind(listenerSocket, (sockaddr *) &sunInterface, sizeof(sockaddr_un)) == SOCKET_ERROR)
+        throw cRuntimeError("PCAPRTUDSScheduler: socket bind() failed");
 
     listen(listenerSocket, SOMAXCONN); /* SOMAXCONN: Maximum queue length specifiable by listen.  */
 }
 
-void PCAPRTScheduler::setupFilewrite()
+void PCAPRTUDSScheduler::setupFilewrite()
 {
     outputFile.open("schedulerLog.pcapng", ios::binary | ios::out);
 }
 
-void PCAPRTScheduler::endRun()
+void PCAPRTUDSScheduler::endRun()
 {
     rtEV << "end run" << endl;
 }
 
-void PCAPRTScheduler::executionResumed()
+void PCAPRTUDSScheduler::executionResumed()
 {
     gettimeofday(&baseTime, nullptr);
     baseTime = timeval_substract(baseTime, SIMTIME_DBL(simTime()));
 }
 
-void PCAPRTScheduler::setInterfaceModule(cModule *mod, cMessage *notifMsg, cMessage *initMsg, unsigned char *buf, int bufSize, int *nBytesPtr)
+void PCAPRTUDSScheduler::setInterfaceModule(cModule *mod, cMessage *notifMsg, cMessage *initMsg, unsigned char *buf, int bufSize, int *nBytesPtr)
 {
     if (module){
         throw cRuntimeError("PCAPRTScheduler: setInterfaceModule() already called");
@@ -132,7 +129,7 @@ void PCAPRTScheduler::setInterfaceModule(cModule *mod, cMessage *notifMsg, cMess
 }
 
 
-bool PCAPRTScheduler::receiveWithTimeout(long usec)
+bool PCAPRTUDSScheduler::receiveWithTimeout(long usec)
 {
     //rtEV << "amount of Bytes in Buffer: " << *numBytesPtr << " "<< nextFramePos << " received new Bytes: " << nBytes << std::endl;
 
@@ -210,7 +207,7 @@ bool PCAPRTScheduler::receiveWithTimeout(long usec)
             connSocket = accept(listenerSocket, (sockaddr *) &sinRemote, (socklen_t *) &addrSize);
             if (connSocket == INVALID_SOCKET)
                 throw cRuntimeError("Socket accept() failed");
-            rtEV << "Client connected on Port " << port << endl;
+            rtEV << "Client connected on " << uds.c_str() << endl;
 
             //if (FILEWRITE) {
             //    sendSHB();
@@ -222,7 +219,7 @@ bool PCAPRTScheduler::receiveWithTimeout(long usec)
     return false;
 }
 
-int PCAPRTScheduler::receiveUntil(const timeval& targetTime)
+int PCAPRTUDSScheduler::receiveUntil(const timeval& targetTime)
 {
     // if there's more than 200ms to wait, wait in 100ms chunks
     // in order to keep UI responsiveness by invoking ev.idle()
@@ -253,7 +250,7 @@ cMessage *PCAPRTScheduler::guessNextEvent()
 }
 */
 
-cMessage *PCAPRTScheduler::getNextEvent()
+cMessage *PCAPRTUDSScheduler::getNextEvent()
 {
     // assert that we've been configured
     if (!module)
@@ -293,13 +290,13 @@ cMessage *PCAPRTScheduler::getNextEvent()
 }
 
 /*
-void PCAPRTScheduler::putBackEvent(cMessage *event)
+void PCAPRTUDSScheduler::putBackEvent(cMessage *event)
 {
     sim->getFES()->putBackFirst(event);
 }
 */
 
-void PCAPRTScheduler::sendSHB()
+void PCAPRTUDSScheduler::sendSHB()
 {
     block_header header;
     section_header_block packet;
@@ -323,7 +320,7 @@ void PCAPRTScheduler::sendSHB()
     sendBytes(sendBuf, header.total_length);
 }
 
-void PCAPRTScheduler::sendIDB(int linktype, int snaplen)
+void PCAPRTUDSScheduler::sendIDB(int linktype, int snaplen)
 {
     block_header header;
     interface_description_block packet;
@@ -347,7 +344,7 @@ void PCAPRTScheduler::sendIDB(int linktype, int snaplen)
 }
 
 
-void PCAPRTScheduler::sendEPB(int interface, simtime_t_cref time, Buffer &b)
+void PCAPRTUDSScheduler::sendEPB(int interface, simtime_t_cref time, Buffer &b)
 {
     block_header header;
     enhanced_packet_block packet;
@@ -383,7 +380,7 @@ void PCAPRTScheduler::sendEPB(int interface, simtime_t_cref time, Buffer &b)
     sendBytes(sendBuf, header.total_length);
 }
 
-void PCAPRTScheduler::sendBytes(unsigned char *buf, size_t numBytes)
+void PCAPRTUDSScheduler::sendBytes(unsigned char *buf, size_t numBytes)
 {
     if (connSocket == INVALID_SOCKET)
             throw cRuntimeError("PCAPRTScheduler: sendBytes(): no connection");
@@ -401,7 +398,7 @@ void PCAPRTScheduler::sendBytes(unsigned char *buf, size_t numBytes)
     rtEV << "sendBytes(" << transmitted << ")" << endl;
 }
 
-void PCAPRTScheduler::checkPacket(uint16_t LinkType)
+void PCAPRTUDSScheduler::checkPacket(uint16_t LinkType)
 {
     switch(LinkType)
     {
@@ -419,7 +416,7 @@ void PCAPRTScheduler::checkPacket(uint16_t LinkType)
     }
 }
 
-void PCAPRTScheduler::handleFragments()
+void PCAPRTUDSScheduler::handleFragments()
 {
     timeval curTime;
     gettimeofday(&curTime, nullptr);
@@ -432,7 +429,7 @@ void PCAPRTScheduler::handleFragments()
     simulation.msgQueue.insert(waitforBytes);
 }
 
-void PCAPRTScheduler::handleSHB()
+void PCAPRTUDSScheduler::handleSHB()
 {
     if (*numBytesPtr >= 8 and SHBReaded == false) {
         if (BT_SHB == read4Bytes(recvBuffer, 0)) {
@@ -459,7 +456,7 @@ void PCAPRTScheduler::handleSHB()
     }
 }
 
-void PCAPRTScheduler::handleIDB()
+void PCAPRTUDSScheduler::handleIDB()
 {
     if (SHBReaded == true) {
         pcapng->openBlock();
@@ -490,7 +487,7 @@ void PCAPRTScheduler::handleIDB()
     }
 }
 
-void PCAPRTScheduler::handleEPB()
+void PCAPRTUDSScheduler::handleEPB()
 {
     if (SHBReaded and IDBReaded) {
         pcapng->openBlock();
@@ -532,7 +529,7 @@ void PCAPRTScheduler::handleEPB()
     }
 }
 
-void PCAPRTScheduler::handleBlock()
+void PCAPRTUDSScheduler::handleBlock()
 {
 
     //rtEV << "handleBlock " << curr_block.block_type << std::endl;
@@ -559,7 +556,7 @@ void PCAPRTScheduler::handleBlock()
     }
 }
 
-bool PCAPRTScheduler::waitForBlock()
+bool PCAPRTUDSScheduler::waitForBlock()
 {
    // if not all Bytes for this Block arrives, simply wait
    if ((unsigned int)*numBytesPtr >= curr_block.total_length) {

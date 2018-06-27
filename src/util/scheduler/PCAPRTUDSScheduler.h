@@ -24,6 +24,7 @@
 #define WANT_WINSOCK2
 
 #include <platdep/sockets.h>
+#include <sys/un.h>
 #include "INETDefs.h"
 
 #if OMNETPP_VERSION < 0x500
@@ -60,10 +61,10 @@
 /*
  * This RTScheduler should PCAP Packets.
  */
-class PCAPRTScheduler : public cRealTimeScheduler
+class PCAPRTUDSScheduler : public cRealTimeScheduler
 {
   protected:
-      int port;
+      std::string uds;
 
       ofstream outputFile;
 
@@ -101,8 +102,8 @@ class PCAPRTScheduler : public cRealTimeScheduler
       virtual int receiveUntil(const timeval& targetTime);
 
   public:
-    PCAPRTScheduler();
-    virtual ~PCAPRTScheduler();
+    PCAPRTUDSScheduler();
+    virtual ~PCAPRTUDSScheduler();
     virtual std::string info() const override;
 
     /*
@@ -178,4 +179,4 @@ class PCAPRTScheduler : public cRealTimeScheduler
     bool waitForBlock();
 };
 
-#endif /* PCAPRTSCHEDULER_H_ */
+#endif /* PCAPRTUDSSCHEDULER_H_ */
