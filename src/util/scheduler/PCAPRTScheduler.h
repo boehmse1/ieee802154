@@ -92,6 +92,7 @@ class PCAPRTScheduler : public cRealTimeScheduler
       timeval baseTime;
       SOCKET listenerSocket;
       SOCKET connSocket;
+      int enableReuse;
       int nBytes;
 
       virtual void setupListener();

@@ -21,7 +21,7 @@ void IEEE802154ExtInterface::initialize(int stage)
     if (stage == 0) {
         rtEvent = new cMessage("rtEvent");
         initEvent = new cMessage("SHB Event");
-        rtScheduler = check_and_cast<PCAPRTUDSScheduler *>(simulation.getScheduler());
+        rtScheduler = check_and_cast<PCAPRTScheduler *>(simulation.getScheduler());
         rtScheduler->setInterfaceModule(this, rtEvent, initEvent, recvBuffer, 65536, &numRecvBytes);
 
         serializer = new IEEE802154Serializer();
@@ -111,15 +111,16 @@ void IEEE802154ExtInterface::handleEPB(cMessage *msg)
     Buffer b(rtBuffer, epb->getDataArraySize());
 
     // Message from external interface
-    cMessage *sdu;
-    sdu = serializer->deserializeSDU(b);
+//    cMessage *sdu;
+//    sdu = serializer->deserializeSDU(b);
+      mpdu *pdu=check_and_cast<mpdu *>(serializer->deserialize(b));
 
     // corresponding module
     cModule *mod = simulation.getModule(interfaceTable[epb->getInterface()]);
     cModule *phy = mod->getSubmodule("NIC")->getSubmodule("PHY");
 
-    this->sendDirect(sdu, phy, "inFromExt");
-
+  //  this->sendDirect(sdu, phy, "inFromExt");
+    this->sendDirect(pdu, phy, "inFromExt");
     this->numRcvd++;
 
     cancelAndDelete(msg);

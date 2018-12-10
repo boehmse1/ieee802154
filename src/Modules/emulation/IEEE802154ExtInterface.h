@@ -43,7 +43,7 @@
 #include "pcapng.h"
 #include "PCAPNGReader.h"
 #include "PCAPNG_m.h"
-#include "PCAPRTUDSScheduler.h"
+#include "PCAPRTScheduler.h"
 
 
 #define extEV (ev.isDisabled()) ? std::cout : std::cout << "[IEEE802154ExtInterface]: "    // switchable debug output
@@ -56,7 +56,7 @@ class IEEE802154ExtInterface : public cSimpleModule
   protected:
     //has to be redefined to prevent memory leak/protection access with them
     cMessage *rtEvent;                  /* new items received at RTScheduler, for event trigger */
-    PCAPRTUDSScheduler *rtScheduler; /* access to real network interface via Scheduler class */
+    PCAPRTScheduler *rtScheduler; /* access to real network interface via Scheduler class */
     cMessage *initEvent;  // signals that a pcap File Header Frame has complete arrived in Buffer
 
     std::map<int, int> interfaceTable;  //interface_id = moduleid
