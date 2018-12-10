@@ -56,6 +56,10 @@ void PCAPRTScheduler::startRun()
 
     port = this->sim->getEnvir()->getConfig()->getAsInt(CFGID_SOCKETRTSCHEDULER_PORT);
     //port = getEnvir()->getConfig()->getAsInt(CFGID_SOCKETRTSCHEDULER_PORT);
+
+    // reuse connection immediately
+    enableReuse = 1;
+
     setupListener();
     //connectSocket();
 
@@ -84,6 +88,9 @@ void PCAPRTScheduler::setupListener()
     listenerSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (listenerSocket == INVALID_SOCKET)
         throw cRuntimeError("PCAPRTScheduler: cannot create socket");
+
+    if (setsockopt(listenerSocket, SOL_SOCKET, SO_REUSEADDR, &enableReuse, sizeof(int)) < 0)
+        throw cRuntimeError("PCAPRTScheduler: socket setsockopt() failed");
 
     sockaddr_in sinInterface;
     sinInterface.sin_family = AF_INET;
@@ -209,7 +216,8 @@ bool PCAPRTScheduler::receiveWithTimeout(long usec)
             int addrSize = sizeof(sinRemote);
             connSocket = accept(listenerSocket, (sockaddr *) &sinRemote, (socklen_t *) &addrSize);
             if (connSocket == INVALID_SOCKET)
-                throw cRuntimeError("Socket accept() failed");
+                throw cRuntimeError("PCAPRTScheduler: Socket accept() failed");
+
             rtEV << "Client connected on Port " << port << endl;
 
             //if (FILEWRITE) {
