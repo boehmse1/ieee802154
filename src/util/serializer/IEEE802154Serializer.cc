@@ -46,8 +46,14 @@ void IEEE802154Serializer::serializeSDU(cMessage *msg, Buffer &b)
         msgTypes["PLME-CCA.request"] = CCA;
         msgTypes["PLME-ED.request"] = ED;
         msgTypes["PD-DATA.request"] = CONF;
+        msgTypes["PLME-PHY-PIB-UPDATE.request"] = REQUPPIB;
 
         switch(msgTypes[msg->getName()]) {
+        case REQUPPIB:{
+            b.writeByte(PLME_PHY_PIB_UPDATE_REQUEST);
+            b.writeByte(sizeof(PLME_PHY_PIB_UPDATE_REQUEST));
+            break;
+        }
         case SETTRXSTATE: {
             b.writeByte(PLME_SET_TRX_STATE_REQUEST);
             b.writeByte(SIZEOF_PLME_SET_TRX_STATE_REQUEST);
@@ -173,6 +179,26 @@ cMessage* IEEE802154Serializer::deserializeSDU(const Buffer &b)
         SetConfirm *conf = new SetConfirm();
         conf->setStatus(b.readByte());
         conf->setPIBattr(b.readByte());
+        return conf;
+        break;
+    }
+    case PLME_PHY_PIB_UPDATE_CONFIRM:{
+        PPIBConfirm *conf = new PPIBConfirm("PLME-PHY-PIB-UPDATE.confirm");
+        conf->setStatus(b.readByte());
+        conf->setPIBcca(b.readByte());
+        conf->setPIBchansup(b.readUint32());
+        conf->setPIBcurcha(b.readByte());
+        conf->setPIBcurpag(b.readByte());
+        conf->setPIBLQI(b.readByte());
+        conf->setPIBmaxframs(b.readUint16());
+        conf->setPIBshdr(b.readByte());
+        conf->setPIBsymOc(b.readByte());
+        conf->setPIBtrPwr(b.readByte());
+        conf->setPIBtrxSt(b.readByte());
+        conf->setPIBrxgain(b.readByte());
+        conf->setPIBtxgain(b.readByte());
+        conf->setPIBbandwidth(b.readUint32());
+        conf->setPIBsamprate(b.readUint32());
         return conf;
         break;
     }

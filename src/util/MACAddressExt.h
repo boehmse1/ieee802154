@@ -19,15 +19,15 @@
  */
 #pragma once
 
-#ifndef MACADDRESS_H_
-#define MACADDRESS_H_
+#ifndef MACADDRESSEXT_H_
+#define MACADDRESSEXT_H_
 
 #include <string>
 #include "INETDefs.h"
 
-#define MAC_ADDRESS_SIZE 8
-#define MAC_ADDRESS_MASK 0xffffffffffffffffUL    // UL to indicate a "unsigned long" hexadecimal constant
-#define MAC_ADDRESS_SHORT_MASK 0xFFFFUL
+#define MAC_ADDRESS_EXT_SIZE 8
+#define MAC_ADDRESS_EXT_MASK 0xffffffffffffffffUL    // UL to indicate a "unsigned long" hexadecimal constant
+#define MAC_ADDRESS_EXT_SHORT_MASK 0xFFFFUL
 
 // Extended version of INET API's MACAddress Class
 
@@ -103,7 +103,7 @@ class MACAddressExt
          */
         static const unsigned int getAddressSize()
         {
-            return MAC_ADDRESS_SIZE;
+            return MAC_ADDRESS_EXT_SIZE;
         }
 
         /**
@@ -126,7 +126,7 @@ class MACAddressExt
          */
         void genShortAddr()
         {
-            shortAddr = address & (MAC_ADDRESS_SHORT_MASK);
+            shortAddr = address & (MAC_ADDRESS_EXT_SHORT_MASK);
         }
 
         unsigned short getShortAddr() const
@@ -167,7 +167,7 @@ class MACAddressExt
          */
         void setBroadcast()
         {
-            address = MAC_ADDRESS_MASK;
+            address = MAC_ADDRESS_EXT_MASK;
         }
 
         /**
@@ -175,7 +175,7 @@ class MACAddressExt
          */
         bool isBroadcast() const
         {
-            return address == MAC_ADDRESS_MASK;
+            return address == MAC_ADDRESS_EXT_MASK;
         }
 
         /**

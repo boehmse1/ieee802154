@@ -26,7 +26,9 @@ enum PIBMsgTypes {
     SET,
     CCA,
     ED,
-    CONF
+    CONF,
+    CONFPPIB,
+    REQUPPIB
 };
 
 enum PHYMsgType {           // needed for serialization of PHY SDUs in emulation mode
@@ -44,7 +46,9 @@ enum PHYMsgType {           // needed for serialization of PHY SDUs in emulation
     PLME_SET_REQUEST,
     PLME_SET_CONFIRM,
     RF_DATA_INDICATION,
-    UNKNOWN_MSG_TYPE
+    UNKNOWN_MSG_TYPE,
+    PLME_PHY_PIB_UPDATE_REQUEST,
+    PLME_PHY_PIB_UPDATE_CONFIRM
 };
 
 inline const char* msgTypeToString(PHYMsgType type)
@@ -65,6 +69,8 @@ inline const char* msgTypeToString(PHYMsgType type)
         case PLME_SET_REQUEST:              return "PLME_SET_REQUEST";
         case PLME_SET_CONFIRM:              return "PLME_SET_CONFIRM";
         case RF_DATA_INDICATION:            return "RF_DATA_INDICATION";
+        case PLME_PHY_PIB_UPDATE_CONFIRM:   return "PLME_PHY_PIB_UPDATE_CONFIRM";
+        case PLME_PHY_PIB_UPDATE_REQUEST:   return "PLME_PHY_PIB_UPDATE_REQUEST";
         default:                            return "[Unknown msgType]";
     }
 }
@@ -116,7 +122,13 @@ enum PhyPIB_Attributes {
     currentPage      = 4,
     maxFrameDuration = 5,
     SHRDuration      = 6,
-    symbolsPerSecond = 7
+    symbolsPerSecond = 7,
+    LQI              = 8,
+    rxgain           = 9,
+    txgain           = 10,
+    bandwidth        = 11,
+    sampling_rate    = 12,
+    TRXstatus        = 13
 };
 
 inline const char* PhyPIB_AttributesToString(PhyPIB_Attributes u)

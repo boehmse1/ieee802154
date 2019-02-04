@@ -36,6 +36,7 @@ void IEEE802154ExtPhy::initialize(int stage)
         mappedUpperLayerMsgTypes["PLME-CCA.request"] = CCA;
         mappedUpperLayerMsgTypes["PLME-ED.request"] = ED;
         mappedUpperLayerMsgTypes["PD-DATA.request"] = CONF;
+        mappedUpperLayerMsgTypes["PLME-PHY-PIB-UPDATE.request"] = REQUPPIB;
 
         // assign the message names for Lower Layer messages (typically confirms)
         mappedLowerLayerMsgTypes["PLME-SET-TRX-STATE.confirm"] = SETTRXSTATE;
@@ -44,8 +45,11 @@ void IEEE802154ExtPhy::initialize(int stage)
         mappedLowerLayerMsgTypes["PLME-CCA.confirm"] = CCA;
         mappedLowerLayerMsgTypes["PLME-ED.confirm"] = ED;
         mappedLowerLayerMsgTypes["PD-DATA.confirm"] = CONF;
+        mappedLowerLayerMsgTypes["PLME-PHY-PIB-UPDATE.confirm"] = CONFPPIB;
+
 
         //  search for modules
+        cModule *nic = getParentModule();
         cModule *host = getParentModule()->getParentModule();
         cModule *network = getParentModule()->getParentModule()->getParentModule();
 
@@ -58,8 +62,27 @@ void IEEE802154ExtPhy::initialize(int stage)
         }
 
         this->moduleID = host->getId();
+
+        for (cModule::SubmoduleIterator i(nic); !i.end(); i++) {
+            cModule *submodp = i();
+            // todo: by name?
+            if (std::string(submodp->getFullName()) == "ExtPhyPIB") {
+                phyPIBID = submodp->getId();
+            }
+        }
+    }
+    else if(stage == 10)
+    {
+
+        cMessage *selfmsg= new cMessage("initial PIB msg");
+        scheduleAt(simTime()+0.01,selfmsg);
     }
 }
+void IEEE802154ExtPhy::requestPIBupdate(){
+    PPIBRequest* requ=new PPIBRequest("PLME-PHY-PIB-UPDATE.request");
+    sendDirect(requ, simulation.getModule(extInterfaceID), "inDirect"); // to extInterface
+}
+
 
 ppdu *IEEE802154ExtPhy::generatePPDU(cMessage *psdu, bool ackFlag)
 {
@@ -85,6 +108,11 @@ ppdu *IEEE802154ExtPhy::generatePPDU(cMessage *psdu, bool ackFlag)
 void IEEE802154ExtPhy::handleMessage(cMessage *msg)
 {
     phyEV << "Got Message " << msg->getName() << endl;
+
+    if(msg->isSelfMessage()){
+        requestPIBupdate();
+        cancelAndDelete(msg);
+    }
 
     if (msg->arrivedOn("PLME_SAP")) // --> Message arrived from MAC over PHY-Management-Layer-Entity SAP
     {
@@ -121,7 +149,8 @@ void IEEE802154ExtPhy::handleMessage(cMessage *msg)
                 phyEV << "PLME-GET.request arrived -> instruct external PHY to get the PhyPIB attribute \n";
                 GetRequest* PhyPIBGet;
                 PhyPIBGet = check_and_cast<GetRequest *>(msg);
-                sendDirect(PhyPIBGet, simulation.getModule(extInterfaceID), "inDirect"); // to extInterface
+                sendDirect(PhyPIBGet,simulation.getModule(phyPIBID), "inDirect");
+//                sendDirect(PhyPIBGet, simulation.getModule(extInterfaceID), "inDirect"); // to extInterface
                 break;
             }
 
@@ -204,6 +233,10 @@ void IEEE802154ExtPhy::handleMessage(cMessage *msg)
             delete (pdu);
             return;
         }
+        else if(mappedUpperLayerMsgTypes[msg->getName()]==REQUPPIB){
+            requestPIBupdate();
+            return;
+        }
 
         switch (mappedLowerLayerMsgTypes[msg->getName()]) // --> PHY-Management Confirm Service Primitives
         {
@@ -221,10 +254,18 @@ void IEEE802154ExtPhy::handleMessage(cMessage *msg)
             case GET:
             case SET:
             case ED: {
+
                 msg->setKind(phy_SUCCESS); // <-- temp ignore phy state from chip module
                 send(msg, "outPLME");
                 return;
             }
+            case CONFPPIB:{
+                PPIBConfirm *pcon=check_and_cast<PPIBConfirm*>(msg);
+                std::cout<<phyPIBID<<" phyPIBID"<<std::endl;
+                sendDirect(pcon,simulation.getModule(15), "inDirect"); // an PHYPIP
+                break;
+            }
+
 
             default: {
                 error("Message %s with kind: %d arrived from external interface is undetermined! \n", msg->getKind(), msg->getName());

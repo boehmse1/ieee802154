@@ -25,7 +25,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "PPDU_m.h"
-#include "PhyPIB.h"
+#include "ExtPhyPIB.h"
 #include "MPDU_m.h"
 #include "IEEE802154Enum.h"
 #include "PlainPkt_m.h"
@@ -48,10 +48,12 @@ public:
 
     void initialize(int stage);
     virtual int numInitStages() const {
-        return 1;
+        return 11;
     }
 
     void handleMessage(cMessage *msg);
+
+    void requestPIBupdate();
 
 private:
     // Map to associate the strings with the enum values (cp. IEEE802154Enum.h)
@@ -61,6 +63,9 @@ private:
     // Ext802154Interface
     int extInterfaceID;
     int moduleID;
+
+    // PhyPIB
+    int phyPIBID;
 };
 
 #endif /* IEEE802154ExtPhy_H_ */

@@ -20,13 +20,14 @@ package ieee802154.src.NED.emulation;
 
 import ieee802154.src.NED.Mac;
 import ieee802154.src.NED.emulation.IEEE802154ExtPhy;
+import ieee802154.src.NED.emulation.ExtPhyPIB;
 
 // IEEE 802.15.4 Network Interface Card (NIC) for emulation support 
 // essentially the PHY and MAC layer inside a compound module
 module IEEE802154ExtNic
 {
     parameters:
-        @display("bgb=156,224");
+        @display("bgb=200,224");
 
     gates:
         input inData;
@@ -43,8 +44,13 @@ module IEEE802154ExtNic
         PHY: IEEE802154ExtPhy {
             @display("p=80,162;i=block/mac");
         }
+        
+        ExtPhyPIB: ExtPhyPIB{
+            @display("p=180,162,i=block/phy");    
+        }
 
     connections allowunconnected:
+       
         inData --> MAC.upperLayerInData;
         inMngt --> MAC.upperLayerInMngt;
 

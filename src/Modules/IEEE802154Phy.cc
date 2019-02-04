@@ -48,7 +48,7 @@ void IEEE802154Phy::initialize(int stage)
 
         tokenizePages();
 
-        pib = PhyPIB(par("currentChannel"), suppPages, par("transmitPower"), par("CCAMode"), par("currentPage"), par("SHRDuration"), par("symbolsPerOctet"));
+//        pib = PhyPIB(par("currentChannel"), suppPages, par("transmitPower"), par("CCAMode"), par("currentPage"), par("SHRDuration"), par("symbolsPerOctet"));
     }
 }
 

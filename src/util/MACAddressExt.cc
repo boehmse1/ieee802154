@@ -28,21 +28,21 @@ const MACAddressExt MACAddressExt::MULTICAST_PAUSE_ADDRESS("01:80:C2:00:00:00:00
 
 unsigned char MACAddressExt::getAddressByte(unsigned int k) const
 {
-    if (k >= MAC_ADDRESS_SIZE)
+    if (k >= MAC_ADDRESS_EXT_SIZE)
     {
         throw cRuntimeError("Array of size 8 indexed with %d", k);
     }
-    int offset = (MAC_ADDRESS_SIZE - k - 1) * 8;
+    int offset = (MAC_ADDRESS_EXT_SIZE - k - 1) * 8;
     return 0xff & (address >> offset);
 }
 
 void MACAddressExt::setAddressByte(unsigned int k, unsigned char addrbyte)
 {
-    if (k >= MAC_ADDRESS_SIZE)
+    if (k >= MAC_ADDRESS_EXT_SIZE)
     {
         throw cRuntimeError("Array of size 8 indexed with %d", k);
     }
-    int offset = (MAC_ADDRESS_SIZE - k - 1) * 8;
+    int offset = (MAC_ADDRESS_EXT_SIZE - k - 1) * 8;
     address = (address & (~(((uint64) 0xff) << offset))) | (((uint64) addrbyte) << offset);
 }
 
@@ -62,7 +62,7 @@ bool MACAddressExt::tryParse(const char *hexstr)
         else if (*s != ' ' && *s != ':' && *s != '-')
             return false; // wrong syntax
     }
-    if (numHexDigits != 2 * MAC_ADDRESS_SIZE)
+    if (numHexDigits != 2 * MAC_ADDRESS_EXT_SIZE)
         return false;
 
     // Converts hex string into the address
@@ -71,7 +71,7 @@ bool MACAddressExt::tryParse(const char *hexstr)
     address = 0; // clear top 16 bits too that setAddressByte() calls skip
     int k = 0;
     const char *s = hexstr;
-    for (int pos = 0; pos < MAC_ADDRESS_SIZE; pos++)
+    for (int pos = 0; pos < MAC_ADDRESS_EXT_SIZE; pos++)
     {
         if (!s || !*s)
         {
@@ -121,7 +121,7 @@ void MACAddressExt::setAddress(const char *hexstr)
 
 void MACAddressExt::getAddressBytes(unsigned char *addrbytes) const
 {
-    for (int i = 0; i < MAC_ADDRESS_SIZE; i++)
+    for (int i = 0; i < MAC_ADDRESS_EXT_SIZE; i++)
     {
         addrbytes[i] = getAddressByte(i);
     }
@@ -130,7 +130,7 @@ void MACAddressExt::getAddressBytes(unsigned char *addrbytes) const
 void MACAddressExt::setAddressBytes(unsigned char *addrbytes)
 {
     address = 0; // clear top 16 bits too that setAddressByte() calls skip
-    for (int i = 0; i < MAC_ADDRESS_SIZE; i++)
+    for (int i = 0; i < MAC_ADDRESS_EXT_SIZE; i++)
     {
         setAddressByte(i, addrbytes[i]);
     }
@@ -141,7 +141,7 @@ std::string MACAddressExt::str() const
 {
     char buf[24];
     char *s = buf;
-    for (int i = 0; i < MAC_ADDRESS_SIZE; i++, s += 3)
+    for (int i = 0; i < MAC_ADDRESS_EXT_SIZE; i++, s += 3)
     {
         sprintf(s, "%2.2X:", getAddressByte(i));
     }
@@ -157,7 +157,7 @@ int MACAddressExt::compareTo(const MACAddressExt& other) const
 
 MACAddressExt MACAddressExt::generateMacAddressWithNodeIndex(unsigned int index)
 {
-    uint64_t genMacAddr = 0x0AAA000000000000 + (index & MAC_ADDRESS_MASK);
+    uint64_t genMacAddr = 0x0AAA000000000000 + (index & MAC_ADDRESS_EXT_MASK);
     MACAddressExt addr(genMacAddr);
     return addr;
 }

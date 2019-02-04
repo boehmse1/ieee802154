@@ -111,16 +111,16 @@ void IEEE802154ExtInterface::handleEPB(cMessage *msg)
     Buffer b(rtBuffer, epb->getDataArraySize());
 
     // Message from external interface
-//    cMessage *sdu;
-//    sdu = serializer->deserializeSDU(b);
-      mpdu *pdu=check_and_cast<mpdu *>(serializer->deserialize(b));
+    cMessage *sdu;
+    sdu = serializer->deserializeSDU(b);
+//      mpdu *pdu=check_and_cast<mpdu *>(serializer->deserialize(b));
 
     // corresponding module
     cModule *mod = simulation.getModule(interfaceTable[epb->getInterface()]);
     cModule *phy = mod->getSubmodule("NIC")->getSubmodule("PHY");
 
-  //  this->sendDirect(sdu, phy, "inFromExt");
-    this->sendDirect(pdu, phy, "inFromExt");
+    this->sendDirect(sdu, phy, "inFromExt");
+//    this->sendDirect(pdu, phy, "inFromExt");
     this->numRcvd++;
 
     cancelAndDelete(msg);

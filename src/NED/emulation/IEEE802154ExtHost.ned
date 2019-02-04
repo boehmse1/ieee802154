@@ -24,7 +24,8 @@ import ieee802154.src.NED.emulation.IEEE802154ExtNic;
 import inet.mobility.contract.IMobility;
 import inet.base.NotificationBoard;
 import inet.battery.IBattery;
-import inet.applications.generic.IPvXTrafGen;	// FIXME IPvXTrafGen wants to register IP protocol -> 802.15.4 LLC dismisses this message
+//import inet.applications.generic.IPvXTrafGen;	// FIXME IPvXTrafGen wants to register IP protocol -> 802.15.4 LLC dismisses this message
+import ieee802154.src.NED.emulation.trafficgen;
 
 module IEEE802154ExtHost
 {
@@ -41,7 +42,7 @@ module IEEE802154ExtHost
         output out;
 
     submodules:
-        application: IPvXTrafGen {
+        application: trafficgen {
             @display("p=174,38");
         }
 
