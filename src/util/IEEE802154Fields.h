@@ -146,4 +146,5 @@ struct PendingAddrFields
         MACAddressExt addrList[7];      // pending address list (shared by short/extended addresses)
 };
 
+
 #endif

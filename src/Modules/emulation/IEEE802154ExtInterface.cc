@@ -49,6 +49,11 @@ void IEEE802154ExtInterface::initialize(int stage)
         extEV << "Registered " << node << " nodes to interfaceTable size " << interfaceTable.size() << endl;
 
     }
+    if (stage == 2){
+
+        rtScheduler->setupandwait();
+
+    }
 
 }
 

@@ -17,22 +17,23 @@ package ieee802154.src.NED.emulation;
 simple ExtPhyPIB
 {
     parameters:
-        int phyCurrentChannel = default(0);         // initial channel to be used
+        int phyCurrentChannel = default(26);         // initial channel to be used
       //  int phyChannelsSupported= default(0);   // possible channels to be used
         int phyTransmitPower= default(0);          // transmission power to be used
-        int phyCCAMode= default(0);                // 3 possible CCA Modes as described in the 2006 revision of the standard
+        int phyCCAMode= default(1);                // 3 possible CCA Modes as described in the 2006 revision of the standard
         int phyCurrentPage= default(0);            // initial page to be used
-        int phySHRDuration= default(0);            // Duration of the sync header
-        double phySymbolsPerOctet= default(0.0);        // Number of symbols to identify 1 octet of data
+        int phySHRDuration= default(10);            // Duration of the sync header
+        double phySymbolsPerOctet= default(2.0);        // Number of symbols to identify 1 octet of data
         int phyMaxFrameDuration= default(0);
-        int phyTRXstatus= default(0);
+        int phyTRXstatus= default(15);
         int phyLQI= default(0);
-        int phytxgain= default(0);
-        int phyrxgain= default(0);
-        int phybandwidth= default(0);
-        int physampling_rate= default(0);
+        int phytxgain= default(48);
+        int phyrxgain= default(55);
+        int phybandwidth= default(3000000);
+        int physampling_rate= default(4000000);
+        int phySignalStrenght= default(0);
         
-        @display("i=block/mac");
+        @display("i=block/table");
     gates:
 //        input SAP_in;
 //        output SAP_out;

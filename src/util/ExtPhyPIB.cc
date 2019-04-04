@@ -25,58 +25,101 @@ Define_Module(ExtPhyPIB);
 
 void ExtPhyPIB::initialize()
 {
+    // assign the message names for lower Layer messages (typically confirms)
+    mappedlowerMsgTypes["PLME-SET.confirm"] = SET;
     // assign the message names for Upper Layer messages (typically requests)
-    mappedMsgTypes["PLME-GET.request"] = GET;
-    mappedMsgTypes["PLME-PHY-PIB-UPDATE.confirm"] = CONFPPIB;
+    mappedupperMsgTypes["PLME-GET.request"] = GET;
+    mappedupperMsgTypes["PLME-SET.request"] = SET;
+    mappedupperMsgTypes["PLME-SET-PHY-PIB.request"] = SETREQUPPIB;
+    mappedupperMsgTypes["PLME-GET-PHY-PIB.request"] = GETREQUPPIB;
 
-    cModule *host = getParentModule();
-    this->getId();
-
-    std::cout<<"PIBmoduleID "<<this->getId()<<std::endl;
 
     phyCurrentChannel=par("phyCurrentChannel");
    // phyChannelsSupported[1]=par("phyChannelsSupported");
+    phyChannelsSupported={0,1};
     phyTransmitPower=par("phyTransmitPower");
     phyCCAMode=par("phyCCAMode");
     phyCurrentPage=par("phyCurrentPage");
     phyMaxFrameDuration=par("phyMaxFrameDuration");
     phySHRDuration=par("phySHRDuration");
     phySymbolsPerOctet=par("phySymbolsPerOctet");
-    phyTRXstatus=par("phyTRXstatus");
     phyLQI=par("phyLQI");
     phytxgain=par("phytxgain");
     phyrxgain=par("phyrxgain");
     phybandwidth=par("phybandwidth");
     physampling_rate=par("physampling_rate");
+
+    cModule *nic = getParentModule();
+
+    for (cModule::SubmoduleIterator i(nic); !i.end(); i++) {
+          cModule *submodp = i();
+          // todo: by name?
+          if (std::string(submodp->getFullName()) == "PHY") {
+              phyID = submodp->getId();
+              std::cout<<"found it"<<std::endl;
+          }
+      }
+    queue = new cQueue();
 }
 
 void ExtPhyPIB::handleMessage(cMessage *msg)
 {
-    switch (mappedMsgTypes[msg->getName()]) // --> PHY-Management Confirm Service Primitives
+    switch (mappedupperMsgTypes[msg->getName()]) // --> PHY-Management Service Primitives
             {
-                case CONFPPIB: {
-                    PPIBConfirm *pcon=check_and_cast<PPIBConfirm*>(msg);
-                    setPhyCcaMode(pcon->getPIBcca());
-                    setPhyCurrentChannel(pcon->getPIBcurcha());
-                    setPhyCurrentPage(pcon->getPIBcurpag());
-    //                setPhyChannelsSupported(pcon->getPIBchansup());
-                    setPhyLqi(pcon->getPIBLQI());
-                    setPhyMaxFrameDuration(pcon->getPIBmaxframs());
-                    setPhyShrDuration(pcon->getPIBshdr());
-                    setPhySymbolsPerOctet(pcon->getPIBsymOc());
-                    setPhyTransmitPower(pcon->getPIBtrPwr());
-                    setPhyTrXstatus(pcon->getPIBtrxSt());
-                    setPhytxgain(pcon->getPIBtxgain());
-                    setPhyrxgain(pcon->getPIBrxgain());
-                    setPhybandwidth(pcon->getPIBbandwidth());
-                    setPhysamplingRate(pcon->getPIBsamprate());
+                case SETREQUPPIB: {
+                    SetPPIBRequest *preq=check_and_cast<SetPPIBRequest*>(msg);
+                    if(msg->getSenderModuleId()==phyID){ // --> only extPHY is allowed to set the values
+                            setPhyCcaMode(preq->getPIBcca());
+                            setPhyCurrentChannel(preq->getPIBcurcha());
+                            setPhyCurrentPage(preq->getPIBcurpag());
+                            setPhyLqi(preq->getPIBLQI());
+                            setPhyMaxFrameDuration(preq->getPIBmaxframs());
+                            setPhyShrDuration(preq->getPIBshdr());
+                            setPhySymbolsPerOctet(preq->getPIBsymOc());
+                            setPhyTransmitPower(preq->getPIBtrPwr());
+                            setPhytxgain(preq->getPIBtxgain());
+                            setPhyrxgain(preq->getPIBrxgain());
+                            setPhybandwidth(preq->getPIBbandwidth());
+                            setPhysamplingRate(preq->getPIBsamprate());
+                            setPhySignalStrenght(preq->getPIBsignalstrengt());
+                            SetPPIBConfirm *pcon=new SetPPIBConfirm("PLME-SET-PHY-PIB.confirm");
+                            pcon->setStatus(phy_SUCCESS);
+                            sendDirect(pcon,msg->getSenderModule(),"inFromExt");
+                            cancelAndDelete(msg);
+
+                    }else{
+                        SetPPIBConfirm *pcon=new SetPPIBConfirm();
+                        pcon->setStatus(phy_UNSUPPORT_ATTRIBUTE);
+                        sendDirect(pcon,msg->getSenderModule(),"inFromExt");
+                        cancelAndDelete(msg);
+                    }
+                    return;
+                }
+                case GETREQUPPIB:{
+
+                    GetPPIBConfirm* pcon=new GetPPIBConfirm("PLME-GET-PHY-PIB.confirm");
+                    pcon->setStatus(phy_SUCCESS);
+                    pcon->setPIBcca(getPhyCcaMode());
+                    pcon->setPIBcurcha(getPhyCurrentChannel());
+                    pcon->setPIBcurpag(getPhyCurrentPage());
+                    pcon->setPIBchansup(0);
+                    pcon->setPIBLQI(getPhyLqi());
+                    pcon->setPIBshdr(getPhyShrDuration());
+                    pcon->setPIBsymOc(getPhySymbolsPerOctet());
+                    pcon->setPIBtrPwr(getPhyTransmitPower());
+                    pcon->setPIBtxgain(getPhytxgain());
+                    pcon->setPIBrxgain(getPhyrxgain());
+                    pcon->setPIBbandwidth(getPhybandwidth());
+                    pcon->setPIBsamprate(getPhysamplingRate());
+                    pcon->setPIBsignalstrength(getPhySignalStrenght());
+
+                    sendDirect(pcon,msg->getSenderModule(),"inFromExt");
                     cancelAndDelete(msg);
-                    break;
+                    return;
                 }
                 case GET:{
-
                     GetRequest *requ=check_and_cast<GetRequest*>(msg);
-                    GetConfirm *confmsg=new GetConfirm();
+                    GetConfirm *confmsg=new GetConfirm("PLME-GET.confirm");
                     confmsg->setPIBind(requ->getPIBind());
                     confmsg->setPIBattr(requ->getPIBattr());
                     confmsg->setStatus(phy_SUCCESS);
@@ -133,12 +176,39 @@ void ExtPhyPIB::handleMessage(cMessage *msg)
                             confmsg->setValue(getPhysamplingRate());
                             break;
                         }
+                        case signalstrength:{
+                            confmsg->setValue(getPhySignalStrenght());
+                            break;
+                        }
 
                     }
-                    sendDirect(confmsg,simulation.getModule(msg->getSenderModule()->getId()),"inFromExt");
-                    break;
+                    sendDirect(confmsg,msg->getSenderModule(),"inFromExt");
+                    return;
+                }
+                case SET:{
+                    OpenRequest* opr=new OpenRequest();
+                    SetRequest* requ=check_and_cast<SetRequest*>(msg);
+                    opr->setModulID(msg->getSenderModule()->getId());
+                    opr->setPIBMsgTypes(SET);
+                    opr->setPIBattr(requ->getPIBattr());
+                    queue->insert(opr);
+                    sendDirect(requ,simulation.getModule(phyID),"inFromExt");
+                    return;
                 }
             }
+    switch (mappedlowerMsgTypes[msg->getName()]) // --> PHY-Management Service Primitives
+                {
+                case SET:{
+                     OpenRequest* opr=check_and_cast<OpenRequest*>(queue->pop());
+                     SetConfirm* conf=check_and_cast<SetConfirm*>(msg);
+                     sendDirect(conf, simulation.getModule(opr->getModulID()), "inFromExt"); // to extPhyPIB
+                     break;
+                }
+                default:{
+                    cancelAndDelete(msg);
+                    break;
+                }
+    }
 }
 
 uint32_t ExtPhyPIB::getPhybandwidth() const {
@@ -252,4 +322,12 @@ uint8_t ExtPhyPIB::getPhytxgain() const {
 
 void ExtPhyPIB::setPhytxgain(uint8_t phytxgain) {
     this->phytxgain = phytxgain;
+}
+
+uint8_t ExtPhyPIB::getPhySignalStrenght() const {
+    return phySignalStrenght;
+}
+
+void ExtPhyPIB::setPhySignalStrenght(uint8_t phySignalStrenght) {
+    this->phySignalStrenght = phySignalStrenght;
 }

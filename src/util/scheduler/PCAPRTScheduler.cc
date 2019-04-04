@@ -36,7 +36,6 @@ std::string PCAPRTScheduler::info() const
     return "RealTime Scheduler based on PCAPNG over TCP-Socket";
 }
 
-
 void PCAPRTScheduler::startRun()
 {
     if (initsocketlibonce() != 0)
@@ -210,25 +209,55 @@ bool PCAPRTScheduler::receiveWithTimeout(long usec)
                 return true;  //yes there was an Event
             }
         }
-        else if (FD_ISSET(listenerSocket, &readFDs)) {
-            // accept connection, and store FD in connSocket
-            sockaddr_in sinRemote;
-            int addrSize = sizeof(sinRemote);
-            connSocket = accept(listenerSocket, (sockaddr *) &sinRemote, (socklen_t *) &addrSize);
-            if (connSocket == INVALID_SOCKET)
-                throw cRuntimeError("PCAPRTScheduler: Socket accept() failed");
-
-            rtEV << "Client connected on Port " << port << endl;
-
-            //if (FILEWRITE) {
-            //    sendSHB();
-            //    sendIDB(DLT_USER0, 256);
-            //    sendIDB(DLT_IEEE802_15_4_NOFCS, 256);
-            //}
-        }
+//        else if (FD_ISSET(listenerSocket, &readFDs)) {
+//            // accept connection, and store FD in connSocket
+//            sockaddr_in sinRemote;
+//            int addrSize = sizeof(sinRemote);
+//            connSocket = accept(listenerSocket, (sockaddr *) &sinRemote, (socklen_t *) &addrSize);
+//            if (connSocket == INVALID_SOCKET)
+//                throw cRuntimeError("PCAPRTScheduler: Socket accept() failed");
+//
+//            rtEV << "Client connected on Port " << port << endl;
+//
+//            //if (FILEWRITE) {
+//            //    sendSHB();
+//            //    sendIDB(DLT_USER0, 256);
+//            //    sendIDB(DLT_IEEE802_15_4_NOFCS, 256);
+//            //}
+//        }
     }
     return false;
 }
+
+void PCAPRTScheduler::setupandwait(){
+
+    // prepare sets for select()
+        fd_set readFDs, writeFDs, exceptFDs;
+        FD_ZERO(&readFDs);
+        FD_ZERO(&writeFDs);
+        FD_ZERO(&exceptFDs);
+
+        // if we're connected, watch connSocket, otherwise accept new connections
+        if (connSocket != INVALID_SOCKET)
+            FD_SET(connSocket, &readFDs);
+        else{
+            FD_SET(listenerSocket, &readFDs);
+
+                if (FD_ISSET(listenerSocket, &readFDs)) {
+                            // accept connection, and store FD in connSocket
+                            sockaddr_in sinRemote;
+                            int addrSize = sizeof(sinRemote);
+                            // accept() waits until a connection is established --> blocks simulation UI
+                            connSocket = accept(listenerSocket, (sockaddr *) &sinRemote, (socklen_t *) &addrSize);
+                            if (connSocket == INVALID_SOCKET)
+                                throw cRuntimeError("PCAPRTScheduler: Socket accept() failed");
+
+                            rtEV << "Client connected on Port " << port << endl;
+                }
+        }
+}
+
+
 
 int PCAPRTScheduler::receiveUntil(const timeval& targetTime)
 {

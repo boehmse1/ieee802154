@@ -177,6 +177,8 @@ class PCAPRTScheduler : public cRealTimeScheduler
     void handleBlock();
 
     bool waitForBlock();
+
+    void setupandwait();
 };
 
 #endif /* PCAPRTSCHEDULER_H_ */

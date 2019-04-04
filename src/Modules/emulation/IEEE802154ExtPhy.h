@@ -48,12 +48,12 @@ public:
 
     void initialize(int stage);
     virtual int numInitStages() const {
-        return 11;
+        return 3;
     }
 
     void handleMessage(cMessage *msg);
 
-    void requestPIBupdate();
+    void SetPIBupdaterequest(cMessage *msg);
 
 private:
     // Map to associate the strings with the enum values (cp. IEEE802154Enum.h)
@@ -66,6 +66,12 @@ private:
 
     // PhyPIB
     int phyPIBID;
+
+    SimTime first=0;
+
+    bool firstupdate = false;
+
+    cQueue* queue;
 };
 
 #endif /* IEEE802154ExtPhy_H_ */

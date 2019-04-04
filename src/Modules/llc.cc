@@ -259,7 +259,13 @@ void llc::handleMessage(cMessage *msg)
         {
             if (!msg->isPacket())
             {
-                error("[802154LLC]: Application layer in convertingMode has to send out cPackets!");
+//                if(dynamic_cast<StartRequest*>(msg)||dynamic_cast<ScanRequest*>(msg)){
+//                    std::cout<<"sende start request"<<endl;
+//                    send(msg, "outMngt");
+//                    return;
+//                }else{
+                    error("[802154LLC]: Application layer in convertingMode has to send out cPackets!");
+//                }
             }
 
             cPacket* pack = check_and_cast<cPacket*>(msg);

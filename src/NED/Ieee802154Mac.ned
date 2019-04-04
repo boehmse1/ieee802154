@@ -21,7 +21,7 @@ package ieee802154.src.NED;
 simple IEEE802154Mac
 {
     parameters:
-        bool macDebug = default(false);         	// debug output switch for the IEEE 802.15.4 MAC module
+        bool macDebug = default(true);         	// debug output switch for the IEEE 802.15.4 MAC module
         
         string macAddr = default("auto"); 	    	// MAC address as hex string (16 hex digits), or "auto" 
                                                 	// "auto" values are replaced by a generated MAC address in init stage 0    

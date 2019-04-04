@@ -46,12 +46,30 @@ void IEEE802154Serializer::serializeSDU(cMessage *msg, Buffer &b)
         msgTypes["PLME-CCA.request"] = CCA;
         msgTypes["PLME-ED.request"] = ED;
         msgTypes["PD-DATA.request"] = CONF;
-        msgTypes["PLME-PHY-PIB-UPDATE.request"] = REQUPPIB;
+        msgTypes["PLME-SET-PHY-PIB.request"] = SETREQUPPIB;
 
         switch(msgTypes[msg->getName()]) {
-        case REQUPPIB:{
-            b.writeByte(PLME_PHY_PIB_UPDATE_REQUEST);
-            b.writeByte(sizeof(PLME_PHY_PIB_UPDATE_REQUEST));
+        case SETREQUPPIB:{
+            SetPPIBRequest* req= check_and_cast<SetPPIBRequest *>(msg);
+            b.writeByte(PLME_SET_PHY_PIB_REQUEST);
+            b.writeByte(sizeof(PLME_SET_PHY_PIB_REQUEST)+sizeof(req->getPIBLQI())+sizeof(req->getPIBbandwidth())+sizeof(req->getPIBcca())+
+                    sizeof(req->getPIBchansup())+sizeof(req->getPIBcurcha())+sizeof(req->getPIBcurpag())+sizeof(req->getPIBmaxframs())
+                    +sizeof(req->getPIBrxgain())+sizeof(req->getPIBsamprate())+sizeof(req->getPIBshdr())+sizeof(req->getPIBsymOc())
+                    +sizeof(req->getPIBtrPwr())+sizeof(req->getPIBtxgain())+sizeof(req->getPIBsignalstrengt()));
+            b.writeByte((unsigned char)req->getPIBcca());
+            b.writeUint32((unsigned int)req->getPIBchansup());
+            b.writeByte((unsigned char)req->getPIBcurcha());
+            b.writeByte((unsigned char)req->getPIBcurpag());
+            b.writeByte((unsigned char)req->getPIBLQI());
+            b.writeUint16((unsigned short) req->getPIBmaxframs());
+            b.writeByte((unsigned char)req->getPIBshdr());
+            b.writeByte((unsigned char)req->getPIBsymOc());
+            b.writeByte((unsigned char)req->getPIBtrPwr());
+            b.writeByte((unsigned char)req->getPIBrxgain());
+            b.writeByte((unsigned char)req->getPIBtxgain());
+            b.writeUint32((unsigned int)req->getPIBbandwidth());
+            b.writeUint32((unsigned int)req->getPIBsamprate());
+            b.writeByte((unsigned char) req->getPIBsignalstrengt());
             break;
         }
         case SETTRXSTATE: {
@@ -88,6 +106,18 @@ void IEEE802154Serializer::serializeSDU(cMessage *msg, Buffer &b)
                     b.writeByte((unsigned char) req->getValue());
                 }
             }
+            if (req->getPIBattr() < 12 && req->getPIBattr() >8 ) {
+                if (req->getPIBattr() < 10){
+                    b.writeByte(SIZEOF_PLME_SET_REQUEST + sizeof(unsigned char));
+                    b.writeByte((unsigned char) req->getPIBattr());
+                    b.writeByte((unsigned char) req->getValue());
+                }else{
+                    b.writeByte(SIZEOF_PLME_SET_REQUEST + sizeof(unsigned int));
+                    b.writeByte((unsigned char) req->getPIBattr());
+                    b.writeUint32((unsigned int) req->getValue());
+                }
+
+            }
             break;
         }
         case CCA: {
@@ -121,7 +151,7 @@ cMessage* IEEE802154Serializer::deserializeSDU(const Buffer &b)
 
     // read message type and length
     uint8_t type = b.readByte();
-    b.readByte(); // length is not needed
+    uint8_t lenghth= b.readByte(); // length is not needed
 
     switch(type) {
     case PD_DATA_CONFIRM: {
@@ -131,7 +161,7 @@ cMessage* IEEE802154Serializer::deserializeSDU(const Buffer &b)
         break;
     }
     case PD_DATA_INDICATION: {
-        pdDataInd *ind = new pdDataInd();
+        pdDataInd *ind = new pdDataInd("PD-DATA.indication");
         ind->setPsduLength(b.readByte());
         ind->setPpduLinkQuality(b.readByte());
         ind->encapsulate(deserialize(b));
@@ -145,14 +175,14 @@ cMessage* IEEE802154Serializer::deserializeSDU(const Buffer &b)
         break;
     }
     case PLME_ED_CONFIRM: {
-        edConf *conf =  new edConf();
+        edConf *conf =  new edConf("PLME-ED.confirm");
         conf->setStatus(b.readByte());
         conf->setEnergyLevel(b.readByte());
         return conf;
         break;
     }
     case PLME_GET_CONFIRM: {
-        GetConfirm *conf = new GetConfirm();
+        GetConfirm *conf = new GetConfirm("PLME-GET.confirm");
         conf->setStatus(b.readByte());
         conf->setPIBattr(b.readByte());
         conf->setPIBind(1); //<-- todo
@@ -176,14 +206,14 @@ cMessage* IEEE802154Serializer::deserializeSDU(const Buffer &b)
         break;
     }
     case PLME_SET_CONFIRM: {
-        SetConfirm *conf = new SetConfirm();
+        SetConfirm *conf = new SetConfirm("PLME-SET.confirm");
         conf->setStatus(b.readByte());
         conf->setPIBattr(b.readByte());
         return conf;
         break;
     }
-    case PLME_PHY_PIB_UPDATE_CONFIRM:{
-        PPIBConfirm *conf = new PPIBConfirm("PLME-PHY-PIB-UPDATE.confirm");
+    case PLME_SET_PHY_PIB_CONFIRM:{
+        SetPPIBConfirm *conf = new SetPPIBConfirm("PLME-SET-PHY-PIB.confirm");
         conf->setStatus(b.readByte());
         conf->setPIBcca(b.readByte());
         conf->setPIBchansup(b.readUint32());
@@ -194,11 +224,31 @@ cMessage* IEEE802154Serializer::deserializeSDU(const Buffer &b)
         conf->setPIBshdr(b.readByte());
         conf->setPIBsymOc(b.readByte());
         conf->setPIBtrPwr(b.readByte());
-        conf->setPIBtrxSt(b.readByte());
         conf->setPIBrxgain(b.readByte());
         conf->setPIBtxgain(b.readByte());
         conf->setPIBbandwidth(b.readUint32());
         conf->setPIBsamprate(b.readUint32());
+        conf->setPIBsignalstrengt(b.readByte());
+        return conf;
+        break;
+    }
+    case PLME_SET_PHY_PIB_INDICATION:{
+        SetPPIBIndication *conf = new SetPPIBIndication("PLME-SET-PHY-PIB.indication");
+        conf->setStatus(b.readByte());
+        conf->setPIBcca(b.readByte());
+        conf->setPIBchansup(b.readUint32());
+        conf->setPIBcurcha(b.readByte());
+        conf->setPIBcurpag(b.readByte());
+        conf->setPIBLQI(b.readByte());
+        conf->setPIBmaxframs(b.readUint16());
+        conf->setPIBshdr(b.readByte());
+        conf->setPIBsymOc(b.readByte());
+        conf->setPIBtrPwr(b.readByte());
+        conf->setPIBrxgain(b.readByte());
+        conf->setPIBtxgain(b.readByte());
+        conf->setPIBbandwidth(b.readUint32());
+        conf->setPIBsamprate(b.readUint32());
+        conf->setPIBsignalstrengt(b.readByte());
         return conf;
         break;
     }
@@ -465,7 +515,7 @@ cPacket* IEEE802154Serializer::deserialize(const Buffer &b)
     std::cout << "(Serializer):Buffer_Pos: " << b.getRemainingSize() << std::endl;
 
     // reset buffer position for reading
-    b.seek(0);
+    //b.seek(0);
 
     // set Byte length of Frame, OMNeT++ specific for casting packet
     pdu->setByteLength(b.getRemainingSize());

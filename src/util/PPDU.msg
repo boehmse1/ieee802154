@@ -72,7 +72,7 @@ message SetConfirm
     unsigned short PIBattr @enum(PhyPIB_Attributes);    // refer to IEEE802154Enum.h
     unsigned short status @enum(PhyPIB_Status); // refer to IEEE802154Enum.h
 }
-message PPIBConfirm
+message GetPPIBConfirm
 {
     unsigned short status @enum(PhyPIB_Status); // refer to IEEE802154Enum.h
     unsigned short PIBcca @enum(PhyPIB_Attributes);    // refer to IEEE802154Enum.h
@@ -83,16 +83,80 @@ message PPIBConfirm
     unsigned short PIBshdr @enum(PhyPIB_Attributes);  
     unsigned short PIBsymOc @enum(PhyPIB_Attributes); 
     unsigned short PIBtrPwr @enum(PhyPIB_Attributes); 
-    unsigned short PIBtrxSt; @enum(PhyPIB_Status);
     unsigned short PIBLQI;
     unsigned short PIBrxgain;
     unsigned short PIBtxgain;
     unsigned int PIBsamprate;
     unsigned int PIBbandwidth;
+    unsigned short PIBsignalstrength;
     
     
 }
-message PPIBRequest
+message GetPPIBRequest
+{   
+}
+
+
+message SetPPIBConfirm
 {
-        
+    unsigned short status @enum(PhyPIB_Status); // refer to IEEE802154Enum.h
+    unsigned short PIBcca @enum(PhyPIB_Attributes);    // refer to IEEE802154Enum.h
+    unsigned int PIBchansup @enum(PhyPIB_Attributes);    // refer to IEEE802154Enum.h
+    unsigned short PIBcurcha @enum(PhyPIB_Attributes); 
+    unsigned short PIBcurpag @enum(PhyPIB_Attributes); 
+    unsigned int PIBmaxframs @enum(PhyPIB_Attributes); 
+    unsigned short PIBshdr @enum(PhyPIB_Attributes);  
+    unsigned short PIBsymOc @enum(PhyPIB_Attributes); 
+    unsigned short PIBtrPwr @enum(PhyPIB_Attributes); 
+    unsigned short PIBLQI;
+    unsigned short PIBrxgain;
+    unsigned short PIBtxgain;
+    unsigned int PIBsamprate;
+    unsigned int PIBbandwidth;
+    unsigned short PIBsignalstrengt;
+    
+    
+}
+message SetPPIBRequest
+{   
+    unsigned short PIBcca @enum(PhyPIB_Attributes);    // refer to IEEE802154Enum.h
+    unsigned int PIBchansup @enum(PhyPIB_Attributes);    // refer to IEEE802154Enum.h
+    unsigned short PIBcurcha @enum(PhyPIB_Attributes); 
+    unsigned short PIBcurpag @enum(PhyPIB_Attributes); 
+    unsigned int PIBmaxframs @enum(PhyPIB_Attributes); 
+    unsigned short PIBshdr @enum(PhyPIB_Attributes);  
+    unsigned short PIBsymOc @enum(PhyPIB_Attributes); 
+    unsigned short PIBtrPwr @enum(PhyPIB_Attributes); 
+    unsigned short PIBLQI;
+    unsigned short PIBrxgain;
+    unsigned short PIBtxgain;
+    unsigned int PIBsamprate;
+    unsigned int PIBbandwidth;
+    unsigned short PIBsignalstrengt;
+}
+message SetPPIBIndication
+{
+    unsigned short status @enum(PhyPIB_Status); // refer to IEEE802154Enum.h
+    unsigned short PIBcca @enum(PhyPIB_Attributes);    // refer to IEEE802154Enum.h
+    unsigned int PIBchansup @enum(PhyPIB_Attributes);    // refer to IEEE802154Enum.h
+    unsigned short PIBcurcha @enum(PhyPIB_Attributes); 
+    unsigned short PIBcurpag @enum(PhyPIB_Attributes); 
+    unsigned int PIBmaxframs @enum(PhyPIB_Attributes); 
+    unsigned short PIBshdr @enum(PhyPIB_Attributes);  
+    unsigned short PIBsymOc @enum(PhyPIB_Attributes); 
+    unsigned short PIBtrPwr @enum(PhyPIB_Attributes); 
+    unsigned short PIBLQI;
+    unsigned short PIBrxgain;
+    unsigned short PIBtxgain;
+    unsigned int PIBsamprate;
+    unsigned int PIBbandwidth;
+    unsigned short PIBsignalstrengt;
+    
+    
+}
+
+message OpenRequest{
+    unsigned int ModulID;
+    unsigned short PIBMsgTypes;
+    unsigned short PIBattr @enum(PhyPIB_Attributes);
 }

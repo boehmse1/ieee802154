@@ -30,6 +30,8 @@
 #include "NodeStatus.h"
 
 #include "PPDU_m.h"
+#include "MPDU_m.h"
+#include "IEEE802154Enum.h"
 
 
 /**
@@ -38,6 +40,13 @@
 class INET_API trafficgen : public cSimpleModule, public ILifecycle
 {
   protected:
+    cLongHistogram lqihist;
+    cOutVector lqivec;
+    cLongHistogram EDhist;
+    cOutVector EDvec;
+    cLongHistogram rxgainhist;
+    cOutVector rxgainvec;
+
     enum Kinds {START=100, NEXT};
     cMessage *timer;
     int protocol;
@@ -50,6 +59,8 @@ class INET_API trafficgen : public cSimpleModule, public ILifecycle
     cPar *sendIntervalPar;
     cPar *packetLengthPar;
     NodeStatus *nodeStatus;
+    std::map<std::string, PIBMsgTypes> mappedMsgTypes;
+    std::map<std::string, mlmeRequestTypes> mappedMlmeMsgTypes;
 
     int numSent;
     static simsignal_t sentPkSignal;
@@ -58,10 +69,15 @@ class INET_API trafficgen : public cSimpleModule, public ILifecycle
     int nicID;
     int ppibID;
 
+    int lqi;
+    int rxGain;
+    int ED;
+
   public:
     trafficgen();
     virtual ~trafficgen();
     virtual bool handleOperationStage(LifecycleOperation *operation, int stage, IDoneCallback *doneCallback);
+    virtual void finish();
 
   protected:
     virtual void scheduleNextPacket(simtime_t previous);
@@ -81,6 +97,9 @@ class INET_API trafficgen : public cSimpleModule, public ILifecycle
 
     virtual void printPacket(cPacket *msg);
     virtual void processPacket(cPacket *msg);
+
+    void sendScanReq();
+    void sendStartReq();
 
 
 };

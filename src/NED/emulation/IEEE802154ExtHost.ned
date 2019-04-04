@@ -42,7 +42,7 @@ module IEEE802154ExtHost
         output out;
 
     submodules:
-        application: trafficgen {
+        application: trafficgen{
             @display("p=174,38");
         }
 

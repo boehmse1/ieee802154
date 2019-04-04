@@ -72,6 +72,10 @@ class IEEE802154ExtInterface : public cSimpleModule
     unsigned int recvPos;
     int numRecvBytes;
 
+    virtual int numInitStages() const {
+        return 5;
+    }
+
   public:
     IEEE802154ExtInterface();
     virtual ~IEEE802154ExtInterface();

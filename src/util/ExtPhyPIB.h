@@ -66,6 +66,8 @@ class ExtPhyPIB : public cSimpleModule
         void setPhyTrXstatus(uint8_t phyTrXstatus);
         uint8_t getPhytxgain() const;
         void setPhytxgain(uint8_t phytxgain);
+    uint8_t getPhySignalStrenght() const;
+    void setPhySignalStrenght(uint8_t phySignalStrenght);
 
     protected:
         void initialize ();
@@ -73,7 +75,8 @@ class ExtPhyPIB : public cSimpleModule
         int moduleID;
 
     private:
-        std::map<std::string, PIBMsgTypes> mappedMsgTypes;
+        std::map<std::string, PIBMsgTypes> mappedupperMsgTypes;
+        std::map<std::string, PIBMsgTypes> mappedlowerMsgTypes;
         unsigned short phyCurrentChannel;
         std::vector<int> phyChannelsSupported;
         unsigned char phyTransmitPower;
@@ -88,7 +91,11 @@ class ExtPhyPIB : public cSimpleModule
         uint8_t phyrxgain;
         uint32_t phybandwidth;
         uint32_t physampling_rate;
+        uint8_t phySignalStrenght;
 
+        cQueue* queue;
+
+        int phyID=0;
 
 
 };

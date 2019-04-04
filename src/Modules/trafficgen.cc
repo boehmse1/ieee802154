@@ -53,6 +53,10 @@ void trafficgen::initialize(int stage)
     // address auto-assignment takes place etc.
     if (stage == 0)
     {
+        mappedMsgTypes["PLME-GET.confirm"] = GET;
+        mappedMsgTypes["PLME-SET.confirm"] = SET;
+        mappedMsgTypes["PLME-GET-PHY-PIB.confirm"] = GETCONFPPIB;
+        mappedMlmeMsgTypes["MLME-SCAN.confirm"] = MLMESCAN;
         protocol = par("protocol");
         numPackets = par("numPackets");
         startTime = par("startTime");
@@ -65,8 +69,25 @@ void trafficgen::initialize(int stage)
 
         numSent = 0;
         numReceived = 0;
+        lqi=0;
+        rxGain=0;
+        ED=0;
+        WATCH(lqi);
+        WATCH(rxGain);
+        WATCH(ED);
         WATCH(numSent);
         WATCH(numReceived);
+        lqihist.setName("LQIstats");
+        lqihist.setRangeAutoUpper(0,255,10);
+        lqivec.setName("lqivec");
+        EDhist.setName("EDstats");
+        EDhist.setRangeAutoUpper(0,255,10);
+        EDvec.setName("EDvec");
+        rxgainhist.setName("rxgainstats");
+        rxgainhist.setRangeAutoUpper(0,255,10);
+        rxgainvec.setName("rxgainvec");
+
+
 
         //  search for modules
         cModule *host = getParentModule();
@@ -88,6 +109,7 @@ void trafficgen::initialize(int stage)
                         ppibID = submodp->getId();
                     }
                 }
+
     }
     else if (stage == 3)
     {
@@ -95,13 +117,6 @@ void trafficgen::initialize(int stage)
         ipSocket.registerProtocol(protocol);
         ipSocket.setOutputGate(gate("ipv6Out"));
         ipSocket.registerProtocol(protocol);
-
-        timer = new cMessage("sendTimer");
-        nodeStatus = dynamic_cast<NodeStatus *>(findContainingNode(this)->getSubmodule("status"));
-        isOperational = (!nodeStatus) || nodeStatus->getState() == NodeStatus::UP;
-
-        if (isNodeUp())
-            startApp();
     }
 }
 
@@ -111,53 +126,87 @@ void trafficgen::startApp()
         scheduleNextPacket(-1);
 }
 
+void trafficgen::finish(){
+
+    EV << "Recieved: "<< numReceived<< endl;
+    lqihist.recordAs("LQI");
+    EDhist.recordAs("ED");
+    rxgainhist.recordAs("rxGain");
+    std::cout<<"called finish"<<std::endl;
+}
+
 void trafficgen::handleMessage(cMessage *msg)
 {
+    numReceived++;
+    bool returnvar=false;
+    std::cout<<"in handle message"<<std::endl;
     if (!isNodeUp()){
         throw cRuntimeError("Application is not running");
     }
-    if (msg->getName()=="PLME-GET.request"){
-            GetConfirm *conf=check_and_cast<GetConfirm*>(msg);
-            int lqi=conf->getValue();
-            if (lqi>=180){
-                sendPacket();
-                if (isEnabled()){
-                   scheduleNextPacket(simTime());
+    if (mappedMsgTypes[msg->getName()]==GETCONFPPIB){
+
+        GetPPIBConfirm *conf=check_and_cast<GetPPIBConfirm*>(msg);
+        lqi=conf->getPIBLQI();
+        rxGain=conf->getPIBrxgain();
+        ED=conf->getPIBsignalstrength();
+
+        lqihist.collect(lqi);
+        lqivec.record(lqi);
+        EDhist.collect(ED);
+        EDvec.record(ED);
+        rxgainhist.collect(rxGain);
+        rxgainvec.record(rxGain);
+
+        if(conf->getPIBLQI()==255){
+            std::cout<<"RX gain = "<< rxGain<<std::endl;
+            SetRequest* PhyPIBSet=new SetRequest("PLME-SET.request");
+            PhyPIBSet->setPIBattr(rxgain);
+            if(rxGain<=51){
+                PhyPIBSet->setValue(rxGain-1);
+            }else if(rxGain<=65){
+                PhyPIBSet->setValue(rxGain-2);
+            }else if(rxGain<=115){
+                PhyPIBSet->setValue(rxGain-5);
+            }
+            sendDirect(PhyPIBSet,simulation.getModule(ppibID), "inDirect");
+
+        }
+        if(lqi<255){
+            SetRequest* PhyPIBSet=new SetRequest("PLME-SET.request");
+            PhyPIBSet->setPIBattr(rxgain);
+            if(ED<252){
+                if(rxGain<=51){
+                    PhyPIBSet->setValue(rxGain+1);
+                }else if(rxGain<=65){
+                    PhyPIBSet->setValue(rxGain+2);
+                }else if(rxGain<=115){
+                    PhyPIBSet->setValue(rxGain+5);
                 }
             }else{
-                //wenn LQI zu schlecht hier den Kanalwechsel beauftragen!
-                //aktuellen Kanal aus PPIB auslesen und dann einen zum wechseln nehmen.
+                if(rxGain<=51){
+                    PhyPIBSet->setValue(rxGain-1);
+                }else if(rxGain<=65){
+                    PhyPIBSet->setValue(rxGain-2);
+                }else if(rxGain<=115){
+                    PhyPIBSet->setValue(rxGain-5);
+                }
             }
+            sendDirect(PhyPIBSet,simulation.getModule(ppibID), "inDirect");
+        }
 
-
-        }
-    if (msg == timer)
-    {
-        if (msg->getKind() == START)
-        {
-            destAddresses.clear();
-            const char *destAddrs = par("destAddresses");
-            cStringTokenizer tokenizer(destAddrs);
-            const char *token;
-            while ((token = tokenizer.nextToken()) != NULL)
-            {
-                IPvXAddress result;
-                IPvXAddressResolver().tryResolve(token, result);
-                if (result.isUnspecified())
-                    EV << "cannot resolve destination address: " << token << endl;
-                else
-                    destAddresses.push_back(result);
-            }
-        }
-        if (!destAddresses.empty())
-        {
-            sendPacket();
-            if (isEnabled())
-                scheduleNextPacket(simTime());
-        }
+        returnvar=true;
     }
-    else
+    if (mappedMsgTypes[msg->getName()]==SET){
+        cancelAndDelete(msg);
+        returnvar=true;
+    }
+
+    if(!returnvar){
+        GetPPIBRequest* PhyPIBGet=new GetPPIBRequest("PLME-GET-PHY-PIB.request");
+        sendDirect(PhyPIBGet,simulation.getModule(ppibID), "inDirect");
         processPacket(PK(msg));
+    }
+
 
     if (ev.isGUI())
     {
@@ -226,6 +275,7 @@ IPvXAddress trafficgen::chooseDestAddr()
 
 void trafficgen::sendPacket()
 {
+    std::cout<<"in send Packet"<<std::endl;
     char msgName[32];
     sprintf(msgName, "appData-%d", numSent);
 
