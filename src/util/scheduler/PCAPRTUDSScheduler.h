@@ -56,7 +56,7 @@
 #include "PCAPNGReader.h"
 #include "Buffer.h"
 
-#define rtEV (ev.isDisabled()) ? std::cout : std::cout << "[PCAPRTScheduler]: "    // switchable debug output
+#define rtEV (ev.isDisabled()) ? std::cout : std::cout << "[PCAPRTUDSScheduler]: "    // switchable debug output
 
 /*
  * This RTScheduler should PCAP Packets.

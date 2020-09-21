@@ -40,7 +40,7 @@ std::string PCAPRTUDSScheduler::info() const
 void PCAPRTUDSScheduler::startRun()
 {
     if (initsocketlibonce() != 0)
-        throw cRuntimeError("PCAPRTScheduler: Cannot initialize socket library");
+        throw cRuntimeError("PCAPRTUDSScheduler: Cannot initialize socket library");
 
     gettimeofday(&baseTime, nullptr);
 
@@ -83,6 +83,8 @@ void PCAPRTUDSScheduler::setupListener()
     if (listenerSocket == INVALID_SOCKET)
         throw cRuntimeError("PCAPRTUDSScheduler: cannot create socket");
 
+    unlink(uds.c_str());
+
     sockaddr_un sunInterface;
     sunInterface.sun_family = AF_LOCAL;
     std::strcpy(sunInterface.sun_path, uds.c_str());
@@ -111,10 +113,10 @@ void PCAPRTUDSScheduler::executionResumed()
 void PCAPRTUDSScheduler::setInterfaceModule(cModule *mod, cMessage *notifMsg, cMessage *initMsg, unsigned char *buf, int bufSize, int *nBytesPtr)
 {
     if (module){
-        throw cRuntimeError("PCAPRTScheduler: setInterfaceModule() already called");
+        throw cRuntimeError("PCAPRTUDSScheduler: setInterfaceModule() already called");
     }
     if (!mod || !notifMsg || !buf || !bufSize || !nBytesPtr){
-        throw cRuntimeError("PCAPRTScheduler: setInterfaceModule(): arguments must be non-nullptr");
+        throw cRuntimeError("PCAPRTUDSScheduler: setInterfaceModule(): arguments must be non-nullptr");
     }
 
     module = mod;
@@ -255,7 +257,7 @@ cMessage *PCAPRTUDSScheduler::getNextEvent()
     // assert that we've been configured
     if (!module)
         throw cRuntimeError(
-                "PCAPRTScheduler: setInterfaceModule() not called: it must be called from a module's initialize() function");
+                "PCAPRTUDSScheduler: setInterfaceModule() not called: it must be called from a module's initialize() function");
 
     // calculate target time
     timeval targetTime;
