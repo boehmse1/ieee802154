@@ -55,8 +55,8 @@ void PCAPRTUDSScheduler::startRun()
     WATCH(recvBufferSize);
 
     uds = this->sim->getEnvir()->getConfig()->getAsString(CFGID_SOCKETRTUDSSCHEDULER_FILE);
-    setupListener();
-    //connectSocket();
+    //setupListener();
+    connectSocket();
 
     if (FILEWRITE) {
         setupFilewrite();

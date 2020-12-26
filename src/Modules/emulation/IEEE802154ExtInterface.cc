@@ -115,7 +115,7 @@ void IEEE802154ExtInterface::handleEPB(cMessage *msg)
     sdu = serializer->deserializeSDU(b);
 
     // corresponding module
-    cModule *mod = simulation.getModule(interfaceTable[epb->getInterface()]);
+    cModule *mod = simulation.getModule(interfaceTable[epb->getInterface()-1]);
     cModule *phy = mod->getSubmodule("NIC")->getSubmodule("PHY");
 
     this->sendDirect(sdu, phy, "inFromExt");
