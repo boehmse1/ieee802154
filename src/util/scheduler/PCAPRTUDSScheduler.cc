@@ -1,4 +1,5 @@
 #include <PCAPRTUDSScheduler.h>
+#include "util/wireshark/Wireshark.h"
 
 #if OMNETPP_BUILDNUM <= 1003
 #define FES(sim) (&sim->msgQueue)
@@ -365,7 +366,7 @@ void PCAPRTUDSScheduler::sendEPB(int interface, simtime_t_cref time, Buffer &b)
     packet.interface_id = interface;
     packet.timestamp_high = (time.raw() - (time.raw() % time.getScale())) / time.getScale();
     //packet.timestamp_high = time.inUnit(0);
-    packet.timestamp_low = 1000000 * (time.raw() % time.getScale()) / time.getScale();
+    packet.timestamp_low = MICROSECONDS * (time.raw() % time.getScale()) / time.getScale();
     //packet.timestamp_low = time.inUnit(-3);
     packet.caplen = len;
     packet.len = len;
@@ -380,6 +381,9 @@ void PCAPRTUDSScheduler::sendEPB(int interface, simtime_t_cref time, Buffer &b)
     memcpy(sendBuf+sizeof(header)+sizeof(packet)+len+padding, &trailer, sizeof(trailer));
 
     sendBytes(sendBuf, header.total_length);
+
+    rtEV << "sendBytes(" << header.total_length << ", Timestamp: " <<
+            packet.timestamp_high << "." << packet.timestamp_low << ")" << endl;
 }
 
 void PCAPRTUDSScheduler::sendBytes(unsigned char *buf, size_t numBytes)
@@ -396,8 +400,6 @@ void PCAPRTUDSScheduler::sendBytes(unsigned char *buf, size_t numBytes)
     }
 
     free(buf);
-
-    rtEV << "sendBytes(" << transmitted << ")" << endl;
 }
 
 void PCAPRTUDSScheduler::checkPacket(uint16_t LinkType)
